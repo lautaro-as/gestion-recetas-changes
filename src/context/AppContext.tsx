@@ -53,13 +53,16 @@ interface AppContextType {
   // Comments
   comments: RecipeComment[];
   addComment: (recipeId: string, content: string, parentCommentId?: string) => void;
+  editComment: (commentId: string, newContent: string) => void;
+  deleteComment: (commentId: string) => void;
+  toggleCommentVote: (commentId: string, type: 'like' | 'dislike') => void;
   
-  // Recipe Comparison (RF-18)
+  // Recipe Comparison
   comparingRecipeIds: string[];
   toggleCompareRecipe: (recipeId: string) => void;
   clearCompareRecipes: () => void;
 
-  // Shopping Cart & Ingredients (RF-22, RF-23, RF-25)
+  // Shopping Cart & Ingredients
   cart: CartItem[];
   addRecipeIngredientsToCart: (recipe: Recipe, selectedIngredientIds?: string[]) => void;
   togglePantryItem: (cartItemId: string) => void;
@@ -68,13 +71,13 @@ interface AppContextType {
   selectedStoreFilter: string;
   setSelectedStoreFilter: (store: string) => void;
 
-  // Wishlist & Collections (RF-06, RF-24)
+  // Wishlist & Collections
   toggleWishlist: (recipeId: string) => void;
   collections: RecipeCollection[];
   createCollection: (name: string, description: string, recipeIds: string[], isPrivate?: boolean) => void;
   toggleRecipeInCollection: (collectionId: string, recipeId: string) => void;
 
-  // Moderation & Reports (RF-11, RF-20)
+  // Moderation & Reports
   reports: ModerationReport[];
   submitReport: (targetType: 'recipe' | 'profile', targetId: string, titleOrName: string, reason: ModerationReport['reason'], details: string) => void;
   resolveReport: (reportId: string, resolution: 'removed' | 'dismissed') => void;
@@ -85,14 +88,17 @@ interface AppContextType {
   createForumTopic: (category: ForumTopic['category'], title: string, content: string, tags: string[]) => string;
   createForumReply: (topicId: string, content: string) => void;
   toggleForumReplyLike: (replyId: string) => void;
+  toggleForumReplyVote: (replyId: string, type: 'like' | 'dislike') => void;
+  editForumReply: (replyId: string, content: string) => void;
+  deleteForumReply: (replyId: string) => void;
   markBestAnswer: (replyId: string) => void;
 
-  // Notifications (RF-28)
+  // Notifications
   notifications: AppNotification[];
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
 
-  // Print & Export (RF-29, RF-30, RF-31)
+  // Print & Export
   printableRecipe: Recipe | null;
   setPrintableRecipe: (recipe: Recipe | null) => void;
   exportRecipeJson: (recipe: Recipe) => void;
@@ -133,12 +139,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.RECIPES);
-    return saved ? JSON.parse(saved) : INITIAL_RECIPES;
+    if (!saved) return INITIAL_RECIPES;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_RECIPES;
+      // Ensure seed scheduled recipes are merged if user had older localStorage
+      const existingIds = new Set(parsed.map((r: Recipe) => r.id));
+      const missing = INITIAL_RECIPES.filter(r => !existingIds.has(r.id));
+      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+    } catch {
+      return INITIAL_RECIPES;
+    }
   });
 
   const [comments, setComments] = useState<RecipeComment[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.COMMENTS);
-    return saved ? JSON.parse(saved) : INITIAL_COMMENTS;
+    if (!saved) return INITIAL_COMMENTS;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_COMMENTS;
+      return parsed.map((c: RecipeComment) => ({
+        ...c,
+        baseLikes: c.baseLikes ?? c.likes ?? 0,
+        baseDislikes: c.baseDislikes ?? 0,
+        likedUserIds: c.likedUserIds || [],
+        dislikedUserIds: c.dislikedUserIds || []
+      }));
+    } catch {
+      return INITIAL_COMMENTS;
+    }
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -148,7 +177,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [reports, setReports] = useState<ModerationReport[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.REPORTS);
-    return saved ? JSON.parse(saved) : INITIAL_REPORTS;
+    if (!saved) return INITIAL_REPORTS;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_REPORTS;
+      const hasPending = parsed.some((r: ModerationReport) => r.status === 'pending');
+      if (!hasPending) {
+        return [...INITIAL_REPORTS.filter(ir => ir.status === 'pending'), ...parsed];
+      }
+      return parsed;
+    } catch {
+      return INITIAL_REPORTS;
+    }
   });
 
   const [collections, setCollections] = useState<RecipeCollection[]>(() => {
@@ -163,7 +203,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [forumReplies, setForumReplies] = useState<ForumReply[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.REPLIES);
-    return saved ? JSON.parse(saved) : INITIAL_FORUM_REPLIES;
+    if (!saved) return INITIAL_FORUM_REPLIES;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_FORUM_REPLIES;
+      return parsed.map((r: ForumReply) => ({
+        ...r,
+        baseLikes: r.baseLikes ?? r.likesCount ?? 0,
+        baseDislikes: r.baseDislikes ?? 0,
+        likedUserIds: r.likedUserIds || [],
+        dislikedUserIds: r.dislikedUserIds || []
+      }));
+    } catch {
+      return INITIAL_FORUM_REPLIES;
+    }
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
@@ -513,14 +566,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       authorId: currentUser.id,
       authorName: currentUser.name,
       authorAvatar: currentUser.avatar,
-      content,
+      content: content.trim(),
       createdAt: new Date().toISOString(),
       likes: 0,
+      likedUserIds: [],
+      dislikedUserIds: [],
       parentCommentId
     };
     setComments(prev => [...prev, newComment]);
     setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, commentsCount: r.commentsCount + 1 } : r));
     showToast('Comentario publicado en la receta.');
+  };
+
+  const editComment = (commentId: string, newContent: string) => {
+    if (!newContent.trim()) return;
+    setComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        return {
+          ...c,
+          content: newContent.trim(),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return c;
+    }));
+    showToast('Comentario editado correctamente.');
+  };
+
+  const deleteComment = (commentId: string) => {
+    const target = comments.find(c => c.id === commentId);
+    if (!target) return;
+    setComments(prev => prev.filter(c => c.id !== commentId && c.parentCommentId !== commentId));
+    setRecipes(prev => prev.map(r => {
+      if (r.id === target.recipeId) {
+        return { ...r, commentsCount: Math.max(0, r.commentsCount - 1) };
+      }
+      return r;
+    }));
+    showToast('Comentario eliminado.');
+  };
+
+  const toggleCommentVote = (commentId: string, type: 'like' | 'dislike') => {
+    setComments(prev => prev.map(c => {
+      if (c.id !== commentId) return c;
+
+      const baseLikes = c.baseLikes !== undefined
+        ? c.baseLikes
+        : (c.likedUserIds && c.likedUserIds.length > 0 ? Math.max(0, (c.likes ?? 0) - c.likedUserIds.length) : (c.likes ?? 0));
+      const baseDislikes = c.baseDislikes ?? 0;
+
+      const likedList = c.likedUserIds || [];
+      const dislikedList = c.dislikedUserIds || [];
+      const isLiked = likedList.includes(currentUser.id);
+      const isDisliked = dislikedList.includes(currentUser.id);
+
+      let nextLiked = [...likedList];
+      let nextDisliked = [...dislikedList];
+
+      if (type === 'like') {
+        if (isLiked) {
+          nextLiked = nextLiked.filter(id => id !== currentUser.id);
+        } else {
+          nextLiked.push(currentUser.id);
+          nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
+        }
+      } else {
+        if (isDisliked) {
+          nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
+        } else {
+          nextDisliked.push(currentUser.id);
+          nextLiked = nextLiked.filter(id => id !== currentUser.id);
+        }
+      }
+
+      return {
+        ...c,
+        baseLikes,
+        baseDislikes,
+        likedUserIds: nextLiked,
+        dislikedUserIds: nextDisliked,
+        likes: baseLikes + nextLiked.length
+      };
+    }));
   };
 
   // Recipe Comparison
@@ -534,7 +661,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
       setComparingRecipeIds(prev => [...prev, recipeId]);
-      showToast('Receta añadida al comparador lado a lado (RF-18).');
+      showToast('Receta añadida al comparador lado a lado.');
     }
   };
 
@@ -595,7 +722,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return u;
     }));
-    showToast(inWishlist ? 'Eliminado de tu lista de deseos (RF-24).' : 'Guardado en tu lista de deseos para cocinar luego.');
+    showToast(inWishlist ? 'Eliminado de tu lista de deseos.' : 'Guardado en tu lista de deseos para cocinar luego.');
   };
 
   const createCollection = (name: string, description: string, recipeIds: string[], isPrivate = false) => {
@@ -692,9 +819,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       authorId: currentUser.id,
       authorName: currentUser.name,
       authorAvatar: currentUser.avatar,
-      content,
+      content: content.trim(),
       createdAt: new Date().toISOString(),
+      baseLikes: 0,
+      baseDislikes: 0,
       likesCount: 0,
+      likedUserIds: [],
+      dislikedUserIds: []
     };
     setForumReplies(prev => [...prev, newReply]);
     setForumTopics(prev => prev.map(t => t.id === topicId ? { ...t, repliesCount: t.repliesCount + 1 } : t));
@@ -702,7 +833,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleForumReplyLike = (replyId: string) => {
-    setForumReplies(prev => prev.map(r => r.id === replyId ? { ...r, likesCount: r.likesCount + 1 } : r));
+    toggleForumReplyVote(replyId, 'like');
+  };
+
+  const toggleForumReplyVote = (replyId: string, type: 'like' | 'dislike') => {
+    setForumReplies(prev => prev.map(r => {
+      if (r.id !== replyId) return r;
+
+      const baseLikes = r.baseLikes !== undefined
+        ? r.baseLikes
+        : (r.likedUserIds && r.likedUserIds.length > 0 ? Math.max(0, (r.likesCount ?? 0) - r.likedUserIds.length) : (r.likesCount ?? 0));
+      const baseDislikes = r.baseDislikes ?? 0;
+
+      const likedList = r.likedUserIds || [];
+      const dislikedList = r.dislikedUserIds || [];
+      const isLiked = likedList.includes(currentUser.id);
+      const isDisliked = dislikedList.includes(currentUser.id);
+
+      let nextLiked = [...likedList];
+      let nextDisliked = [...dislikedList];
+
+      if (type === 'like') {
+        if (isLiked) {
+          nextLiked = nextLiked.filter(id => id !== currentUser.id);
+        } else {
+          nextLiked.push(currentUser.id);
+          nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
+        }
+      } else {
+        if (isDisliked) {
+          nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
+        } else {
+          nextDisliked.push(currentUser.id);
+          nextLiked = nextLiked.filter(id => id !== currentUser.id);
+        }
+      }
+
+      return {
+        ...r,
+        baseLikes,
+        baseDislikes,
+        likedUserIds: nextLiked,
+        dislikedUserIds: nextDisliked,
+        likesCount: baseLikes + nextLiked.length
+      };
+    }));
+  };
+
+  const editForumReply = (replyId: string, content: string) => {
+    if (!content.trim()) return;
+    setForumReplies(prev => prev.map(r => r.id === replyId ? { ...r, content: content.trim(), updatedAt: new Date().toISOString() } : r));
+    showToast('Respuesta editada correctamente.');
+  };
+
+  const deleteForumReply = (replyId: string) => {
+    const target = forumReplies.find(r => r.id === replyId);
+    if (!target) return;
+    setForumReplies(prev => prev.filter(r => r.id !== replyId));
+    setForumTopics(prev => prev.map(t => t.id === target.topicId ? { ...t, repliesCount: Math.max(0, t.repliesCount - 1) } : t));
+    showToast('Respuesta eliminada.');
   };
 
   const markBestAnswer = (replyId: string) => {
@@ -732,7 +921,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    showToast(`Receta "${recipe.title}" exportada en formato JSON (RF-29).`);
+    showToast(`Receta "${recipe.title}" exportada en formato JSON.`);
   };
 
   const exportRecipeText = (recipe: Recipe) => {
@@ -789,7 +978,7 @@ Gusto - Sistema de Gestión de Recetas.
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    showToast(`Paquete de recetas y planificador semanal descargado (RF-30).`);
+    showToast(`Paquete de recetas y planificador semanal descargado.`);
   };
 
   return (
@@ -819,6 +1008,9 @@ Gusto - Sistema de Gestión de Recetas.
 
         comments,
         addComment,
+        editComment,
+        deleteComment,
+        toggleCommentVote,
 
         comparingRecipeIds,
         toggleCompareRecipe,
@@ -846,6 +1038,9 @@ Gusto - Sistema de Gestión de Recetas.
         createForumTopic,
         createForumReply,
         toggleForumReplyLike,
+        toggleForumReplyVote,
+        editForumReply,
+        deleteForumReply,
         markBestAnswer,
 
         notifications,

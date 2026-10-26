@@ -44,7 +44,7 @@ function AppContent() {
   // Navigation view: 'explorar' | 'destacadas' | 'foro' | 'comparar' | 'perfil' | 'moderacion'
   const [activeView, setActiveView] = useState<string>('explorar');
 
-  // Search & Filter State (RF-07, RF-16)
+  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('todas');
   const [selectedTags, setSelectedTags] = useState<DietaryTag[]>([]);
@@ -60,7 +60,7 @@ function AppContent() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   
-  // Report modal state (RF-11, RF-20)
+  // Report modal state
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
     type: 'recipe' | 'profile';
@@ -94,7 +94,7 @@ function AppContent() {
         return false;
       }
 
-      // Search query filter (RF-16: keyword, ingredient, title)
+      // Search query filter (keyword, ingredient, title)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = recipe.title.toLowerCase().includes(q);
@@ -113,7 +113,7 @@ function AppContent() {
         return false;
       }
 
-      // Dietary tags filter (RF-07: vegetarian, vegan, celiac, diabetic, keto...)
+      // Dietary tags filter (vegetarian, vegan, celiac, diabetic, keto...)
       if (selectedTags.length > 0) {
         const hasAllTags = selectedTags.every((tag) => recipe.tags.includes(tag));
         if (!hasAllTags) return false;
@@ -155,7 +155,7 @@ function AppContent() {
     setIsEditorOpen(true);
   };
 
-  // If printable recipe is triggered (RF-31), render full screen print preview!
+  // If printable recipe is triggered, render full screen print preview!
   if (printableRecipe) {
     return (
       <PrintRecipeView
@@ -314,7 +314,28 @@ function AppContent() {
 
         {/* VIEW 6: Panel de Moderación */}
         {activeView === 'moderacion' && (
-          <ModerationAdminPanel />
+          currentUser.role === 'admin' ? (
+            <ModerationAdminPanel />
+          ) : (
+            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-4 max-w-lg mx-auto my-12 shadow-sm">
+              <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
+                <span className="material-symbols-outlined text-[32px]">shield_person</span>
+              </div>
+              <h2 className="font-bold text-stone-900 text-xl font-display">Acceso Restringido</h2>
+              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                El panel de moderación está reservado exclusivamente para cuentas con rol de <strong>Administrador</strong>.
+              </p>
+              <p className="text-xs text-stone-400">
+                Puedes cambiar a la cuenta de Administrador (Ignacio Gómez) usando el menú superior de usuario.
+              </p>
+              <button
+                onClick={() => setActiveView('explorar')}
+                className="px-6 py-2.5 bg-[#E09F3E] text-white rounded-full text-xs font-bold hover:bg-[#835500] transition-colors cursor-pointer"
+              >
+                Volver a Explorar
+              </button>
+            </div>
+          )
         )}
       </main>
 
@@ -337,20 +358,22 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-4 text-xs">
             <span className="text-[#514536]">Plataforma Gastronómica de Recetas</span>
-            <button
-              onClick={() => setActiveView('moderacion')}
-              className="inline-flex items-center gap-1.5 text-xs text-[#333333] hover:text-[#000000] font-medium transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[#835500] text-[18px]">verified_user</span>
-              <span>Políticas de seguridad</span>
-            </button>
+            {currentUser.role === 'admin' && (
+              <button
+                onClick={() => setActiveView('moderacion')}
+                className="inline-flex items-center gap-1.5 text-xs text-[#333333] hover:text-[#000000] font-medium transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[#835500] text-[18px]">verified_user</span>
+                <span>Panel de moderación</span>
+              </button>
+            )}
           </div>
         </div>
       </footer>
 
       {/* Modals and Drawers */}
       <RecipeDetailModal
-        recipe={selectedRecipeDetail}
+        recipe={recipes.find((r) => r.id === selectedRecipeDetail?.id) || selectedRecipeDetail}
         onClose={() => setSelectedRecipeDetail(null)}
         onEditRecipe={handleEditRecipe}
         onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}

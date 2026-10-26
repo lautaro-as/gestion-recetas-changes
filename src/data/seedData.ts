@@ -742,6 +742,92 @@ export const INITIAL_RECIPES: Recipe[] = [
         durationMinutes: 10
       }
     ]
+  },
+  {
+    id: 'rec-scheduled-1',
+    title: 'Focaccia Genovese con Romero y Aceitunas Kalamata',
+    description: 'Masa de alta hidratación fermentada lentamente en frío durante 48 horas con hoyuelos profundos de aceite de oliva virgen extra y sal marina en escamas.',
+    coverImage: 'https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80',
+    authorId: 'user-mateo',
+    authorName: 'Mateo Rossi',
+    authorAvatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&auto=format&fit=crop&q=80',
+    coAuthors: ['@lucianutri'],
+    status: 'scheduled',
+    scheduledPublishDate: '2026-11-15T18:00:00.000Z',
+    createdAt: '2026-10-20T10:00:00.000Z',
+    updatedAt: '2026-10-20T10:00:00.000Z',
+    prepTimeMin: 30,
+    cookTimeMin: 25,
+    servings: 6,
+    difficulty: 'media',
+    category: 'panaderia',
+    tags: ['vegetariano', 'vegano'],
+    isFeaturedMonth: false,
+    nutrition: { calories: 280, proteinG: 7, carbsG: 48, fatG: 8, fiberG: 3 },
+    likesCount: 0,
+    dislikesCount: 0,
+    likedUserIds: [],
+    dislikedUserIds: [],
+    commentsCount: 0,
+    ingredients: [
+      {
+        id: 'ing-foc-1',
+        name: 'Harina de fuerza W300',
+        quantity: 500,
+        unit: 'g',
+        estimatedPrice: 1.80,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'secos'
+      },
+      {
+        id: 'ing-foc-2',
+        name: 'Aceite de oliva virgen extra de cosecha temprana',
+        quantity: 60,
+        unit: 'ml',
+        estimatedPrice: 2.50,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'frescos'
+      },
+      {
+        id: 'ing-foc-3',
+        name: 'Aceitunas Kalamata griegas descarozadas',
+        quantity: 100,
+        unit: 'g',
+        estimatedPrice: 2.10,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
+        inStock: true,
+        stockLevel: 'medio',
+        category: 'frescos'
+      }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: 'Amasado y primera fermentación en bloque',
+        description: 'Mezclar harina, 400ml de agua fría y sal marina. Desarrollar el gluten con pliegues cada 30 minutos.',
+        durationMinutes: 20,
+        tip: 'Mantener las manos ligeramente aceitadas para evitar que la masa se pegue.'
+      },
+      {
+        stepNumber: 2,
+        title: 'Volcado en bandeja y hoyuelos característicos',
+        description: 'Extender suavemente con los dedos formando hoyuelos profundos, bañar en salmuera con romero y aceitunas.',
+        durationMinutes: 10
+      },
+      {
+        stepNumber: 3,
+        title: 'Horneado a alta temperatura',
+        description: 'Hornear a 230°C con vapor durante 22-25 minutos hasta que la superficie quede dorada y crujiente.',
+        durationMinutes: 25
+      }
+    ]
   }
 ];
 
@@ -754,7 +840,11 @@ export const INITIAL_COMMENTS: RecipeComment[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&auto=format&fit=crop&q=80',
     content: '¡Excelente técnica con la autólisis! Yo suelo reemplazar 50g con harina de centeno integral y el aroma que desprende es inigualable.',
     createdAt: '2026-09-16T14:20:00.000Z',
-    likes: 12
+    baseLikes: 12,
+    baseDislikes: 0,
+    likes: 12,
+    likedUserIds: [],
+    dislikedUserIds: []
   },
   {
     id: 'comm-2',
@@ -764,7 +854,11 @@ export const INITIAL_COMMENTS: RecipeComment[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&auto=format&fit=crop&q=80',
     content: '¡Gran aporte Lucía! El centeno además le da un empuje enzimático fenomenal a la masa.',
     createdAt: '2026-09-16T15:10:00.000Z',
-    likes: 8,
+    baseLikes: 5,
+    baseDislikes: 0,
+    likes: 5,
+    likedUserIds: [],
+    dislikedUserIds: [],
     parentCommentId: 'comm-1'
   },
   {
@@ -775,7 +869,11 @@ export const INITIAL_COMMENTS: RecipeComment[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&auto=format&fit=crop&q=80',
     content: 'Nunca me quedaba el pesto tan brillante. El truco de enfriar el aceite de oliva antes de emulsionar cambió todo.',
     createdAt: '2026-09-29T18:45:00.000Z',
-    likes: 5
+    baseLikes: 8,
+    baseDislikes: 0,
+    likes: 8,
+    likedUserIds: [],
+    dislikedUserIds: []
   }
 ];
 
@@ -793,7 +891,12 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
     repliesCount: 4,
     viewsCount: 310,
     tags: ['Masa Madre', 'Conservación', 'Pan Casero'],
-    isPinned: true
+    isPinned: true,
+    baseLikes: 24,
+    baseDislikes: 0,
+    likesCount: 24,
+    likedUserIds: [],
+    dislikedUserIds: []
   },
   {
     id: 'top-2',
@@ -808,7 +911,12 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
     repliesCount: 8,
     viewsCount: 680,
     tags: ['Sin TACC', 'Celíacos', 'Técnicas Harinas'],
-    isPinned: true
+    isPinned: true,
+    baseLikes: 42,
+    baseDislikes: 0,
+    likesCount: 42,
+    likedUserIds: [],
+    dislikedUserIds: []
   },
   {
     id: 'top-3',
@@ -822,7 +930,12 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
     createdAt: '2026-09-30T17:40:00.000Z',
     repliesCount: 5,
     viewsCount: 420,
-    tags: ['Dutch Oven', 'Equipamiento', 'Greñado']
+    tags: ['Dutch Oven', 'Equipamiento', 'Greñado'],
+    baseLikes: 18,
+    baseDislikes: 0,
+    likesCount: 18,
+    likedUserIds: [],
+    dislikedUserIds: []
   }
 ];
 
@@ -835,7 +948,11 @@ export const INITIAL_FORUM_REPLIES: ForumReply[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&auto=format&fit=crop&q=80',
     content: '¡Para 15 días lo más seguro es hacer un refresco rígido (50% de hidratación en vez de 100%), meterlo bien al fondo de la nevera donde la temperatura es constante a 3-4°C. Al volver, con dos refrescos seguidos vuelve a duplicar en 4 horas!',
     createdAt: '2026-10-02T16:20:00.000Z',
+    baseLikes: 15,
+    baseDislikes: 0,
     likesCount: 15,
+    likedUserIds: [],
+    dislikedUserIds: [],
     isBestAnswer: true
   },
   {
@@ -846,7 +963,11 @@ export const INITIAL_FORUM_REPLIES: ForumReply[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&auto=format&fit=crop&q=80',
     content: '¡Maravillosa explicación Lucía! Siempre tenía dudas de las proporciones exactas. ¿Cuánto porcentaje recomendás por kilo de mezcla de harinas sin gluten?',
     createdAt: '2026-09-25T14:30:00.000Z',
-    likesCount: 6
+    baseLikes: 6,
+    baseDislikes: 0,
+    likesCount: 6,
+    likedUserIds: [],
+    dislikedUserIds: []
   }
 ];
 
@@ -876,6 +997,19 @@ export const INITIAL_REPORTS: ModerationReport[] = [
     details: 'Suplantación de identidad de cocinero profesional publicando contenido obsceno en comentarios.',
     status: 'pending',
     createdAt: '2026-10-04T09:40:00.000Z'
+  },
+  {
+    id: 'rep-mod-3',
+    targetType: 'recipe',
+    targetId: 'rec-6',
+    targetTitleOrName: 'Curry Cremoso de Garbanzos y Calabaza Kabocha',
+    targetAuthorOrOwner: 'Mateo Rossi',
+    reporterId: 'user-camila',
+    reporterName: 'Camila Ríos',
+    reason: 'peligro_alimentario',
+    details: 'Advertencia sobre alérgenos no especificados con claridad en los ingredientes opcionales.',
+    status: 'pending',
+    createdAt: '2026-10-05T14:15:00.000Z'
   }
 ];
 

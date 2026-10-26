@@ -37,12 +37,13 @@ interface RecipeDetailModalProps {
 }
 
 export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
-  recipe,
+  recipe: initialRecipe,
   onClose,
   onEditRecipe,
   onOpenReport,
 }) => {
   const {
+    recipes,
     currentUser,
     toggleLikeRecipe,
     toggleDislikeRecipe,
@@ -53,6 +54,9 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
     addRecipeIngredientsToCart,
     comments,
     addComment,
+    editComment,
+    deleteComment,
+    toggleCommentVote,
     followUserToggle,
     setPrintableRecipe,
     exportRecipeJson,
@@ -63,10 +67,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   const [commentText, setCommentText] = useState('');
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
   const [selectedIngredientIds, setSelectedIngredientIds] = useState<string[]>([]);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
-  if (!recipe) return null;
+  if (!initialRecipe) return null;
+  const recipe = recipes.find((r) => r.id === initialRecipe.id) || initialRecipe;
 
   const isAuthor = recipe.authorId === currentUser.id;
   const canEdit = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
@@ -120,7 +127,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la receta "${recipe.title}"? (RF-12)`)) {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la receta "${recipe.title}"?`)) {
       if (deleteRecipe(recipe.id)) {
         onClose();
       }
@@ -132,7 +139,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs overflow-y-auto cursor-pointer"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs overflow-y-auto cursor-default"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -645,41 +652,166 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
             {/* Comments List */}
             <div className="space-y-4">
               {rootComments.length === 0 ? (
-                <div className="text-center py-8 text-stone-400 text-xs">
+                <div className="text-center py-8 text-stone-400 text-xs bg-stone-50/50 rounded-2xl border border-stone-100">
                   Aún no hay comentarios en esta receta. ¡Sé el primero en compartir tu experiencia!
                 </div>
               ) : (
                 rootComments.map((comment) => {
                   const replies = recipeComments.filter((c) => c.parentCommentId === comment.id);
+                  const isAuthorOrMod = comment.authorId === currentUser.id || currentUser.role === 'admin' || currentUser.role === 'editor';
+                  const baseLikes = comment.baseLikes !== undefined
+                    ? comment.baseLikes
+                    : (comment.likedUserIds && comment.likedUserIds.length > 0 ? Math.max(0, (comment.likes ?? 0) - comment.likedUserIds.length) : (comment.likes ?? 0));
+                  const totalLikes = baseLikes + (comment.likedUserIds?.length ?? 0);
+                  const totalDislikes = (comment.baseDislikes ?? 0) + (comment.dislikedUserIds?.length ?? 0);
+                  const score = totalLikes - totalDislikes;
+                  const isUpvoted = comment.likedUserIds?.includes(currentUser.id) ?? false;
+                  const isDownvoted = comment.dislikedUserIds?.includes(currentUser.id) ?? false;
+
                   return (
-                    <div key={comment.id} className="p-4 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-3">
-                      <div className="flex items-start justify-between">
+                    <div key={comment.id} className="p-4 sm:p-5 rounded-2xl bg-stone-50/90 border border-stone-200/80 space-y-3">
+                      {/* Comment Header */}
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2.5">
                           <img
                             src={comment.authorAvatar}
                             alt={comment.authorName}
-                            className="w-8 h-8 rounded-full object-cover"
+                            className="w-8 h-8 rounded-full object-cover shadow-xs"
                           />
                           <div>
                             <div className="text-xs font-bold text-stone-900">{comment.authorName}</div>
-                            <div className="text-[10px] text-stone-400">
-                              {new Date(comment.createdAt).toLocaleDateString('es-ES')}
+                            <div className="text-[11px] text-stone-400 flex items-center gap-1.5">
+                              <span>
+                                {new Date(comment.createdAt).toLocaleDateString('es-ES', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                              {comment.updatedAt && (
+                                <span className="text-[10px] text-stone-400 italic">(editado)</span>
+                              )}
                             </div>
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setReplyingToId(replyingToId === comment.id ? null : comment.id)}
-                          className="text-xs text-amber-700 hover:underline font-semibold"
-                        >
-                          Responder
-                        </button>
+                        {/* Top Action Buttons: Reply, Edit, Delete */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setReplyingToId(replyingToId === comment.id ? null : comment.id)}
+                            className="text-xs text-[#835500] hover:underline font-semibold cursor-pointer"
+                          >
+                            Responder
+                          </button>
+
+                          {isAuthorOrMod && (
+                            <>
+                              <button
+                                type="button"
+                                title="Editar comentario"
+                                onClick={() => {
+                                  setEditingCommentId(comment.id);
+                                  setEditingCommentText(comment.content);
+                                }}
+                                className="p-1 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Eliminar comentario"
+                                onClick={() => {
+                                  if (window.confirm('¿Deseas eliminar este comentario permanentemente?')) {
+                                    deleteComment(comment.id);
+                                  }
+                                }}
+                                className="p-1 text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
 
-                      <p className="text-xs sm:text-sm text-stone-700 leading-relaxed pl-10">
-                        {comment.content}
-                      </p>
+                      {/* Comment Content / Inline Edit Mode */}
+                      {editingCommentId === comment.id ? (
+                        <div className="pl-10 space-y-2">
+                          <textarea
+                            rows={2}
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-amber-300 text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 outline-none resize-none"
+                          />
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingCommentId(null)}
+                              className="px-3 py-1 rounded-lg text-xs font-semibold text-stone-600 hover:bg-stone-200"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                editComment(comment.id, editingCommentText);
+                                setEditingCommentId(null);
+                              }}
+                              className="px-3 py-1 rounded-lg text-xs font-bold bg-[#E09F3E] text-white hover:bg-[#835500]"
+                            >
+                              Guardar Cambios
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs sm:text-sm text-stone-700 leading-relaxed pl-10">
+                          {comment.content}
+                        </p>
+                      )}
+
+                      {/* Reddit-style Upvote / Downvote Net Score Bar */}
+                      <div className="pl-10 flex items-center gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleCommentVote(comment.id, 'like')}
+                          title="Voto positivo / Like"
+                          className={`p-1 rounded-md transition-colors cursor-pointer flex items-center justify-center ${
+                            isUpvoted
+                              ? 'bg-[#FFDDB9] text-[#835500] font-bold'
+                              : 'text-stone-400 hover:text-[#835500] hover:bg-stone-200/60'
+                          }`}
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+
+                        <span
+                          className={`text-xs font-bold font-mono px-2 py-0.5 rounded-full select-none ${
+                            score > 0
+                              ? 'text-[#835500] bg-[#FFDDB9]/60 font-extrabold'
+                              : score < 0
+                              ? 'text-red-700 bg-red-100 font-extrabold'
+                              : 'text-stone-500 bg-stone-200/70'
+                          }`}
+                        >
+                          {score > 0 ? `+${score}` : score}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleCommentVote(comment.id, 'dislike')}
+                          title="Voto negativo / Dislike"
+                          className={`p-1 rounded-md transition-colors cursor-pointer flex items-center justify-center ${
+                            isDownvoted
+                              ? 'bg-red-100 text-red-700 font-bold'
+                              : 'text-stone-400 hover:text-red-600 hover:bg-stone-200/60'
+                          }`}
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
                       {/* Reply form if active */}
                       {replyingToId === comment.id && (
@@ -694,7 +826,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleReplySubmit(comment.id)}
-                            className="px-3 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700"
+                            className="px-3 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700 cursor-pointer"
                           >
                             Enviar
                           </button>
@@ -703,23 +835,141 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
 
                       {/* Nested replies */}
                       {replies.length > 0 && (
-                        <div className="pl-10 space-y-2.5 pt-2 border-l-2 border-amber-200 ml-4">
-                          {replies.map((reply) => (
-                            <div key={reply.id} className="bg-white p-3 rounded-xl border border-stone-200">
-                              <div className="flex items-center gap-2 mb-1">
-                                <img
-                                  src={reply.authorAvatar}
-                                  alt={reply.authorName}
-                                  className="w-6 h-6 rounded-full object-cover"
-                                />
-                                <span className="text-xs font-bold text-stone-800">{reply.authorName}</span>
-                                <span className="text-[10px] text-stone-400">
-                                  {new Date(reply.createdAt).toLocaleDateString('es-ES')}
-                                </span>
+                        <div className="pl-6 sm:pl-10 space-y-2.5 pt-2 border-l-2 border-amber-200 ml-4">
+                          {replies.map((reply) => {
+                            const isReplyAuthorOrMod = reply.authorId === currentUser.id || currentUser.role === 'admin' || currentUser.role === 'editor';
+                            const repBaseLikes = reply.baseLikes !== undefined
+                              ? reply.baseLikes
+                              : (reply.likedUserIds && reply.likedUserIds.length > 0 ? Math.max(0, (reply.likes ?? 0) - reply.likedUserIds.length) : (reply.likes ?? 0));
+                            const repTotalLikes = repBaseLikes + (reply.likedUserIds?.length ?? 0);
+                            const repTotalDislikes = (reply.baseDislikes ?? 0) + (reply.dislikedUserIds?.length ?? 0);
+                            const repScore = repTotalLikes - repTotalDislikes;
+                            const isRepUpvoted = reply.likedUserIds?.includes(currentUser.id) ?? false;
+                            const isRepDownvoted = reply.dislikedUserIds?.includes(currentUser.id) ?? false;
+
+                            return (
+                              <div key={reply.id} className="bg-white p-3.5 rounded-xl border border-stone-200 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <img
+                                      src={reply.authorAvatar}
+                                      alt={reply.authorName}
+                                      className="w-6 h-6 rounded-full object-cover"
+                                    />
+                                    <div>
+                                      <span className="text-xs font-bold text-stone-800">{reply.authorName}</span>
+                                      <div className="text-[10px] text-stone-400 flex items-center gap-1">
+                                        <span>
+                                          {new Date(reply.createdAt).toLocaleDateString('es-ES', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </span>
+                                        {reply.updatedAt && (
+                                          <span className="italic">(editado)</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {isReplyAuthorOrMod && (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        title="Editar respuesta"
+                                        onClick={() => {
+                                          setEditingCommentId(reply.id);
+                                          setEditingCommentText(reply.content);
+                                        }}
+                                        className="p-1 text-stone-400 hover:text-stone-700"
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        title="Eliminar respuesta"
+                                        onClick={() => {
+                                          if (window.confirm('¿Deseas eliminar esta respuesta?')) {
+                                            deleteComment(reply.id);
+                                          }
+                                        }}
+                                        className="p-1 text-stone-400 hover:text-red-600"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {editingCommentId === reply.id ? (
+                                  <div className="pl-8 space-y-2">
+                                    <textarea
+                                      rows={2}
+                                      value={editingCommentText}
+                                      onChange={(e) => setEditingCommentText(e.target.value)}
+                                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-amber-300 text-xs focus:ring-2 focus:ring-amber-500 outline-none resize-none"
+                                    />
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingCommentId(null)}
+                                        className="px-2 py-0.5 rounded text-xs text-stone-600 hover:bg-stone-100"
+                                      >
+                                        Cancelar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          editComment(reply.id, editingCommentText);
+                                          setEditingCommentId(null);
+                                        }}
+                                        className="px-2 py-0.5 rounded text-xs font-bold bg-[#E09F3E] text-white hover:bg-[#835500]"
+                                      >
+                                        Guardar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-stone-700 pl-8 leading-snug">{reply.content}</p>
+                                )}
+
+                                {/* Reply Voting */}
+                                <div className="pl-8 flex items-center gap-1.5 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleCommentVote(reply.id, 'like')}
+                                    className={`p-0.5 rounded transition-colors ${
+                                      isRepUpvoted ? 'text-[#835500] font-bold' : 'text-stone-400 hover:text-[#835500]'
+                                    }`}
+                                  >
+                                    <ThumbsUp className="w-3 h-3" />
+                                  </button>
+                                  <span
+                                    className={`text-[11px] font-bold font-mono px-1.5 py-0.2 rounded ${
+                                      repScore > 0
+                                        ? 'text-[#835500] bg-[#FFDDB9]/60'
+                                        : repScore < 0
+                                        ? 'text-red-700 bg-red-100'
+                                        : 'text-stone-400'
+                                    }`}
+                                  >
+                                    {repScore > 0 ? `+${repScore}` : repScore}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleCommentVote(reply.id, 'dislike')}
+                                    className={`p-0.5 rounded transition-colors ${
+                                      isRepDownvoted ? 'text-red-700 font-bold' : 'text-stone-400 hover:text-red-600'
+                                    }`}
+                                  >
+                                    <ThumbsDown className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-xs text-stone-700 pl-8">{reply.content}</p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

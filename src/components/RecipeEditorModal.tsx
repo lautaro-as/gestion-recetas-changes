@@ -22,15 +22,6 @@ interface RecipeEditorModalProps {
   recipeToEdit?: Recipe | null;
 }
 
-const PRESET_COVERS = [
-  { label: 'Pan Rústico', url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80' },
-  { label: 'Pasta Pesto', url: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80' },
-  { label: 'Bowl Saludable', url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80' },
-  { label: 'Postre / Cheesecake', url: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80' },
-  { label: 'Curry / Estofado', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800&auto=format&fit=crop&q=80' },
-  { label: 'Sopa Gourmet', url: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=80' },
-];
-
 export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   isOpen,
   onClose,
@@ -40,7 +31,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
 
   const [title, setTitle] = useState(recipeToEdit?.title || '');
   const [description, setDescription] = useState(recipeToEdit?.description || '');
-  const [coverImage, setCoverImage] = useState(recipeToEdit?.coverImage || PRESET_COVERS[0].url);
+  const [coverImage, setCoverImage] = useState(recipeToEdit?.coverImage || '');
   const [prepTimeMin, setPrepTimeMin] = useState(recipeToEdit?.prepTimeMin || 20);
   const [cookTimeMin, setCookTimeMin] = useState(recipeToEdit?.cookTimeMin || 30);
   const [servings, setServings] = useState(recipeToEdit?.servings || 4);
@@ -49,6 +40,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   const [tags, setTags] = useState<DietaryTag[]>(recipeToEdit?.tags || ['vegetariano']);
   const [videoUrl, setVideoUrl] = useState(recipeToEdit?.videoUrl || '');
   const [coAuthorsText, setCoAuthorsText] = useState(recipeToEdit?.coAuthors.join(', ') || '');
+  const [showCollaboratorSuggestions, setShowCollaboratorSuggestions] = useState(false);
   
   // Publication Status & Scheduling
   const [status, setStatus] = useState<RecipeStatus>(recipeToEdit?.status || 'published');
@@ -181,6 +173,10 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
     }
     if (!title.trim()) {
       showToast('Por favor introduce un título para la receta.');
+      return;
+    }
+    if (!coverImage.trim()) {
+      showToast('Debes proporcionar una imagen propia para la receta.');
       return;
     }
 
@@ -362,54 +358,142 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Foto de Portada (URL o Presets)
+                  Foto de Portada de la Receta *
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="url"
+                    required
                     value={coverImage}
                     onChange={(e) => setCoverImage(e.target.value)}
                     className="flex-1 px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500"
                     placeholder="https://..."
                   />
-                </div>
-                {/* Presets */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {PRESET_COVERS.map((preset) => (
+                  {coverImage && (
                     <button
-                      key={preset.label}
                       type="button"
-                      onClick={() => setCoverImage(preset.url)}
-                      className={`text-[10px] px-2 py-1 rounded-lg border font-medium transition-colors ${
-                        coverImage === preset.url
-                          ? 'bg-amber-600 text-white border-amber-600'
-                          : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                      }`}
+                      onClick={() => setCoverImage('')}
+                      className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl text-xs font-semibold"
                     >
-                      {preset.label}
+                      Limpiar
                     </button>
-                  ))}
+                  )}
                 </div>
-                {/* Image preview */}
-                <div className="mt-2 h-28 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
-                  <img src={coverImage} alt="Vista previa" className="w-full h-full object-cover" />
-                </div>
+
+                {/* Image preview or empty placeholder */}
+                {!coverImage.trim() ? (
+                  <div className="mt-2 h-32 rounded-2xl bg-amber-50/50 border-2 border-dashed border-amber-300/80 flex flex-col items-center justify-center text-center p-3">
+                    <span
+                      className="material-symbols-outlined text-[#835500] text-[36px] mb-1"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      room_service
+                    </span>
+                    <span className="text-xs font-bold text-stone-800">
+                      Aún no se ha seleccionado una imágen
+                    </span>
+                    <span className="text-[10px] text-stone-500 mt-0.5">
+                      Ingresa una URL propia para visualizar la receta
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-2 h-32 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 relative group">
+                    <img
+                      src={coverImage}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&auto=format&fit=crop&q=80';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setCoverImage('')}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Quitar imagen</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div>
+              <div className="relative">
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1 flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-amber-600" />
                   Co-autores Colaborativos
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Lucía Valenzuela, Camila Ríos (separados por coma)"
+                  placeholder="Ej. @lucianutri, @camicocina (escribe para autocompletar)"
                   value={coAuthorsText}
-                  onChange={(e) => setCoAuthorsText(e.target.value)}
+                  onFocus={() => setShowCollaboratorSuggestions(true)}
+                  onChange={(e) => {
+                    setCoAuthorsText(e.target.value);
+                    setShowCollaboratorSuggestions(true);
+                  }}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500"
                 />
+
+                {/* Autocomplete Dropdown List matching registered users */}
+                {(() => {
+                  const currentToken = coAuthorsText.split(',').pop()?.trim().toLowerCase().replace(/^@/, '') || '';
+                  const suggestions = currentToken.length > 0
+                    ? allUsers.filter(u => {
+                        if (u.id === currentUser.id) return false;
+                        return u.name.toLowerCase().includes(currentToken) || u.username.toLowerCase().includes(currentToken);
+                      })
+                    : [];
+
+                  if (!showCollaboratorSuggestions || suggestions.length === 0) return null;
+
+                  return (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-2xl shadow-xl border border-stone-200 py-1.5 z-30 max-h-48 overflow-y-auto">
+                      <div className="px-3 py-1 text-[10px] font-bold text-stone-400 uppercase">
+                        Usuarios sugeridos:
+                      </div>
+                      {suggestions.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => {
+                            const parts = coAuthorsText.split(',');
+                            parts.pop();
+                            parts.push(`@${user.username}`);
+                            const updated = parts.map(p => p.trim()).filter(Boolean).join(', ');
+                            setCoAuthorsText(updated ? updated + ', ' : '');
+                            setShowCollaboratorSuggestions(false);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-amber-50 flex items-center justify-between transition-colors cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={user.avatar}
+                              alt={user.name}
+                              className="w-6 h-6 rounded-full object-cover"
+                            />
+                            <div>
+                              <span className="text-xs font-bold text-stone-900 group-hover:text-[#835500]">
+                                {user.name}
+                              </span>
+                              <span className="text-[11px] text-stone-400 ml-1.5">
+                                @{user.username}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-semibold text-[#835500] group-hover:underline">
+                            Etiquetar +
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 <p className="text-[10px] text-stone-500 mt-1">
-                  Permite compartir la autoría y atribución pública entre dos o más cocineros.
+                  Permite compartir la autoría con otros cocineros registrados en la plataforma.
                 </p>
               </div>
 

@@ -18,6 +18,23 @@ export const ModerationAdminPanel: React.FC = () => {
   const { reports, resolveReport, currentUser } = useApp();
   const [filterStatus, setFilterStatus] = useState<'pending' | 'resolved' | 'all'>('pending');
 
+  if (currentUser.role !== 'admin') {
+    return (
+      <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-4 max-w-lg mx-auto my-12 shadow-sm">
+        <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="font-bold text-stone-900 text-xl font-display">Acceso Restringido a Administradores</h2>
+        <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+          El panel de moderación está reservado exclusivamente para cuentas con rol de <strong>Administrador</strong>.
+        </p>
+        <p className="text-xs text-stone-400">
+          Usa el menú de usuario en la barra superior para cambiar a la cuenta con rol de Administrador.
+        </p>
+      </div>
+    );
+  }
+
   const filteredReports = reports.filter((r) => {
     if (filterStatus === 'pending') return r.status === 'pending';
     if (filterStatus === 'resolved') return r.status !== 'pending';
@@ -26,11 +43,11 @@ export const ModerationAdminPanel: React.FC = () => {
 
   const getReasonBadge = (reason: ModerationReport['reason']) => {
     switch (reason) {
-      case 'inapropiado': return { label: 'Inapropiado', color: 'bg-red-100 text-red-800 border-red-200' };
-      case 'spam': return { label: 'Spam / Publicidad', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
-      case 'plagio': return { label: 'Plagio / Copyright', color: 'bg-purple-100 text-purple-800 border-purple-200' };
+      case 'inapropiado': return { label: 'Inapropiado', color: 'bg-rose-100 text-rose-800 border-rose-200' };
+      case 'spam': return { label: 'Spam / Publicidad', color: 'bg-amber-100 text-amber-900 border-amber-200' };
+      case 'plagio': return { label: 'Plagio / Copia', color: 'bg-purple-100 text-purple-800 border-purple-200' };
       case 'peligro_alimentario': return { label: 'Peligro Alimentario', color: 'bg-orange-100 text-orange-800 border-orange-200' };
-      case 'acoso': return { label: 'Acoso', color: 'bg-rose-100 text-rose-800 border-rose-200' };
+      case 'acoso': return { label: 'Acoso', color: 'bg-red-100 text-red-800 border-red-200' };
       default: return { label: 'Otro', color: 'bg-stone-100 text-stone-800 border-stone-200' };
     }
   };
@@ -38,22 +55,22 @@ export const ModerationAdminPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-red-900 text-white p-6 sm:p-8 rounded-3xl shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-[#2B1700] via-[#5A3900] to-[#835500] text-white p-6 sm:p-8 rounded-3xl shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-800/80 text-red-200 text-xs font-bold uppercase mb-2 border border-red-700">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-amber-200 text-xs font-bold uppercase mb-2 border border-white/20">
             <ShieldAlert className="w-3.5 h-3.5" />
             Centro de Seguridad & Políticas Comunitarias
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold font-serif-display">
             Panel de Moderación
           </h2>
-          <p className="text-red-200 text-xs sm:text-sm mt-1 max-w-xl leading-relaxed">
-            Revisión y auditoría de denuncias de recetas inapropiadas, plagios, y reportes de conductas en perfiles para garantizar la seguridad de la comunidad.
+          <p className="text-amber-100/90 text-xs sm:text-sm mt-1 max-w-xl leading-relaxed">
+            Revisión y auditoría de denuncias de recetas inapropiadas, plagios y reportes de conductas en perfiles para garantizar la seguridad de la comunidad.
           </p>
         </div>
 
-        <div className="px-4 py-2 bg-red-950/60 rounded-2xl border border-red-800 text-xs text-red-200">
-          <span>Administrador: <strong>{currentUser ? currentUser.name : 'Personal Autorizado'}</strong></span>
+        <div className="px-4 py-2.5 bg-black/30 rounded-2xl border border-white/10 text-xs text-amber-100 backdrop-blur-xs">
+          <span>Administrador activo: <strong>{currentUser.name}</strong></span>
         </div>
       </div>
 

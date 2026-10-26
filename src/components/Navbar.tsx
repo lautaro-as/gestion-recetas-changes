@@ -145,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Mi espacio
               </button>
 
-              {(currentUser.role === 'admin' || currentUser.role === 'editor') && (
+              {currentUser.role === 'admin' && (
                 <button
                   onClick={() => setActiveView('moderacion')}
                   className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
@@ -409,7 +409,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Mi espacio
           </button>
-          {(currentUser.role === 'admin' || currentUser.role === 'editor') && (
+          {currentUser.role === 'admin' && (
             <button
               onClick={() => setActiveView('moderacion')}
               className={`px-3 py-1 rounded-full transition-all shrink-0 ${

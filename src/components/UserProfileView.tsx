@@ -43,13 +43,13 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [bio, setBio] = useState(currentUser.bio);
   const [specialtiesText, setSpecialtiesText] = useState(currentUser.specialties.join(', '));
 
-  // Add subprofile state (RF-03)
+  // Add subprofile state
   const [showAddSubProfile, setShowAddSubProfile] = useState(false);
   const [subName, setSubName] = useState('');
   const [subRelation, setSubRelation] = useState('Familiar');
   const [subDiet, setSubDiet] = useState<DietaryTag[]>([]);
 
-  // Create collection state (RF-24, RF-30)
+  // Create collection state
   const [showCreateCollection, setShowCreateCollection] = useState(false);
   const [colName, setColName] = useState('');
   const [colDesc, setColDesc] = useState('');
@@ -61,10 +61,10 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const myWishlist = recipes.filter((r) => currentUser.wishlistRecipeIds.includes(r.id));
   const myCollections = collections.filter((c) => c.userId === currentUser.id);
 
-  // Pinned recipe if exists (RF-17)
+  // Pinned recipe if exists
   const pinnedRecipe = recipes.find((r) => r.id === currentUser.pinnedRecipeId);
 
-  // Profile search (RF-21)
+  // Profile search
   const filteredUsers = allUsers.filter((u) => {
     return (
       u.name.toLowerCase().includes(profileSearchQuery.toLowerCase()) ||
@@ -687,22 +687,59 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {/* 3. PROGRAMADAS */}
       {activeTab === 'programadas' && (
         <div className="space-y-4">
-          <h3 className="text-sm font-bold text-[#1B1C1C]">
-            Recetas programadas para publicación automática
-          </h3>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#1B1C1C]">
+                Recetas programadas para publicación automática
+              </h3>
+              <p className="text-xs text-stone-500">
+                Lanzamientos automáticos en fecha y hora fijada por el autor
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onCreateRecipe}
+              className="px-3.5 py-1.5 rounded-full bg-[#E09F3E] text-white text-xs font-semibold hover:bg-[#835500] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              <span>Programar nueva receta</span>
+            </button>
+          </div>
+
           {myScheduled.length === 0 ? (
-            <div className="bg-white rounded-3xl p-8 text-center border border-stone-200/60 text-xs text-stone-400">
-              No tienes recetas programadas actualmente. Puedes programar la fecha de publicación al crear o editar una receta.
+            <div className="bg-white rounded-3xl p-10 text-center border border-stone-200/60 text-xs text-stone-500 space-y-2">
+              <span className="material-symbols-outlined text-[36px] text-[#835500] block mx-auto">
+                event_upcoming
+              </span>
+              <p className="font-semibold text-stone-700">No tienes recetas programadas actualmente.</p>
+              <p className="text-stone-400 max-w-md mx-auto">
+                Al crear o editar una receta, selecciona "Programar Lanzamiento" y define la fecha deseada para que se publique automáticamente.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {myScheduled.map((recipe) => (
-                <RecipeCard
-                  key={recipe.id}
-                  recipe={recipe}
-                  onOpenDetail={onOpenDetail}
-                  onOpenReport={(r) => onOpenReport('recipe', r.id, r.title)}
-                />
+                <div key={recipe.id} className="flex flex-col gap-2">
+                  {recipe.scheduledPublishDate && (
+                    <div className="bg-amber-50 text-amber-900 border border-amber-200/90 px-3 py-1.5 rounded-2xl text-xs font-semibold flex items-center gap-1.5 shadow-xs">
+                      <span className="material-symbols-outlined text-[16px] text-[#835500]">schedule</span>
+                      <span>
+                        Se publicará: <strong>{new Date(recipe.scheduledPublishDate).toLocaleDateString('es-ES', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</strong>
+                      </span>
+                    </div>
+                  )}
+                  <RecipeCard
+                    recipe={recipe}
+                    onOpenDetail={onOpenDetail}
+                    onOpenReport={(r) => onOpenReport('recipe', r.id, r.title)}
+                  />
+                </div>
               ))}
             </div>
           )}

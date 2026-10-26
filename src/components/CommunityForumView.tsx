@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ForumTopic, ForumReply } from '../types';
 import { ScrollableFilterBar } from './ScrollableFilterBar';
+import { ThumbsUp, ThumbsDown, Edit3, Trash2 } from 'lucide-react';
 
 export const CommunityForumView: React.FC = () => {
   const {
@@ -11,7 +12,9 @@ export const CommunityForumView: React.FC = () => {
     forumReplies,
     createForumTopic,
     createForumReply,
-    toggleForumReplyLike,
+    toggleForumReplyVote,
+    editForumReply,
+    deleteForumReply,
     markBestAnswer,
     followUserToggle,
   } = useApp();
@@ -29,6 +32,8 @@ export const CommunityForumView: React.FC = () => {
 
   // New reply form state
   const [replyContent, setReplyContent] = useState('');
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editingReplyText, setEditingReplyText] = useState('');
 
   // Topic like state
   const [likedTopicIds, setLikedTopicIds] = useState<string[]>([]);
@@ -205,15 +210,51 @@ export const CommunityForumView: React.FC = () => {
                   {activeTopic.content}
                 </p>
 
-                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-50">
-                  <div className="w-10 h-10 rounded-full bg-[#E09F3E]/20 text-[#835500] flex items-center justify-center font-bold text-sm">
-                    {activeTopic.authorName.charAt(0)}
+                <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#E09F3E]/20 text-[#835500] flex items-center justify-center font-bold text-sm">
+                      {activeTopic.authorName.charAt(0)}
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-stone-900 block leading-tight">
+                        {activeTopic.authorName}
+                      </span>
+                      <span className="text-xs text-[#865300]">Autor del debate</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-sm font-bold text-stone-900 block leading-tight">
-                      {activeTopic.authorName}
-                    </span>
-                    <span className="text-xs text-[#865300]">Autor del debate</span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => toggleTopicLike(activeTopic.id, e)}
+                      title="Voto positivo / Like"
+                      className={`px-3 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 text-xs ${
+                        likedTopicIds.includes(activeTopic.id)
+                          ? 'bg-[#FFDDB9] text-[#835500] font-bold'
+                          : 'text-stone-600 bg-stone-100 hover:text-[#835500] hover:bg-stone-200/70'
+                      }`}
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <span>{(activeTopic.baseLikes ?? 24) + (likedTopicIds.includes(activeTopic.id) ? 1 : 0)} votos</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => toggleTopicSave(activeTopic.id, e)}
+                      title="Guardar discusión"
+                      className={`px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs flex items-center gap-1.5 ${
+                        savedTopicIds.includes(activeTopic.id)
+                          ? 'bg-amber-100 text-amber-900 font-bold'
+                          : 'text-stone-600 bg-stone-100 hover:text-stone-800 hover:bg-stone-200/70'
+                      }`}
+                    >
+                      <span
+                        className="material-symbols-outlined text-[16px]"
+                        style={savedTopicIds.includes(activeTopic.id) ? { fontVariationSettings: "'FILL' 1" } : {}}
+                      >
+                        bookmark
+                      </span>
+                      <span>Guardar</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -232,67 +273,191 @@ export const CommunityForumView: React.FC = () => {
                     Aún no hay respuestas en este debate. ¡Sé el primero en compartir tu experiencia!
                   </p>
                 ) : (
-                  currentTopicReplies.map((reply) => (
-                    <div
-                      key={reply.id}
-                      className={`p-4 rounded-2xl border transition-all ${
-                        reply.isBestAnswer
-                          ? 'bg-amber-50/60 border-amber-300'
-                          : 'bg-stone-50/70 border-stone-200/80'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={reply.authorAvatar}
-                            alt={reply.authorName}
-                            className="w-7 h-7 rounded-full object-cover"
-                          />
-                          <span className="text-xs font-bold text-stone-900">
-                            {reply.authorName}
-                          </span>
-                          <span className="text-[10px] text-stone-400">
-                            • {new Date(reply.createdAt).toLocaleDateString()}
-                          </span>
+                  currentTopicReplies.map((reply) => {
+                    const isReplyAuthorOrMod = reply.authorId === currentUser.id || currentUser.role === 'admin' || currentUser.role === 'editor';
+                    const repBaseLikes = reply.baseLikes !== undefined
+                      ? reply.baseLikes
+                      : (reply.likedUserIds && reply.likedUserIds.length > 0 ? Math.max(0, (reply.likesCount ?? 0) - reply.likedUserIds.length) : (reply.likesCount ?? 0));
+                    const repTotalLikes = repBaseLikes + (reply.likedUserIds?.length ?? 0);
+                    const repTotalDislikes = (reply.baseDislikes ?? 0) + (reply.dislikedUserIds?.length ?? 0);
+                    const repScore = repTotalLikes - repTotalDislikes;
+                    const isRepUpvoted = reply.likedUserIds?.includes(currentUser.id) ?? false;
+                    const isRepDownvoted = reply.dislikedUserIds?.includes(currentUser.id) ?? false;
+
+                    return (
+                      <div
+                        key={reply.id}
+                        className={`p-4 sm:p-5 rounded-2xl border transition-all space-y-3 ${
+                          reply.isBestAnswer
+                            ? 'bg-amber-50/70 border-amber-300 shadow-xs'
+                            : 'bg-stone-50/90 border-stone-200/80'
+                        }`}
+                      >
+                        {/* Reply Header */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <img
+                              src={reply.authorAvatar}
+                              alt={reply.authorName}
+                              className="w-8 h-8 rounded-full object-cover shadow-xs"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-stone-900">
+                                  {reply.authorName}
+                                </span>
+                                {reply.authorId === activeTopic.authorId && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FFDDB9] text-[#714500]">
+                                    Autor
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-stone-400 flex items-center gap-1.5">
+                                <span>
+                                  {new Date(reply.createdAt).toLocaleDateString('es-ES', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                                {reply.updatedAt && (
+                                  <span className="text-[10px] text-stone-400 italic">(editado)</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {reply.isBestAnswer && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#835500] bg-white px-2.5 py-1 rounded-full border border-amber-200 shadow-xs">
+                                <span className="material-symbols-outlined text-[14px]">verified</span>
+                                Mejor Respuesta
+                              </span>
+                            )}
+
+                            {!reply.isBestAnswer &&
+                              (currentUser.id === activeTopic.authorId ||
+                                currentUser.role === 'admin' ||
+                                currentUser.role === 'editor') && (
+                                <button
+                                  type="button"
+                                  onClick={() => markBestAnswer(reply.id)}
+                                  className="text-[11px] font-semibold text-[#835500] hover:underline cursor-pointer"
+                                >
+                                  Marcar destacada
+                                </button>
+                              )}
+
+                            {isReplyAuthorOrMod && (
+                              <>
+                                <button
+                                  type="button"
+                                  title="Editar respuesta"
+                                  onClick={() => {
+                                    setEditingReplyId(reply.id);
+                                    setEditingReplyText(reply.content);
+                                  }}
+                                  className="p-1 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Eliminar respuesta"
+                                  onClick={() => {
+                                    if (window.confirm('¿Deseas eliminar esta respuesta permanentemente?')) {
+                                      deleteForumReply(reply.id);
+                                    }
+                                  }}
+                                  className="p-1 text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
 
-                        {reply.isBestAnswer && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#835500] bg-white px-2.5 py-0.5 rounded-full border border-amber-200 shadow-xs">
-                            <span className="material-symbols-outlined text-[14px]">verified</span>
-                            Mejor Respuesta
-                          </span>
+                        {/* Reply Content / Inline Edit Form */}
+                        {editingReplyId === reply.id ? (
+                          <div className="pl-10 space-y-2">
+                            <textarea
+                              rows={3}
+                              value={editingReplyText}
+                              onChange={(e) => setEditingReplyText(e.target.value)}
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-amber-300 text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 outline-none resize-none"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingReplyId(null)}
+                                className="px-3 py-1 rounded-lg text-xs font-semibold text-stone-600 hover:bg-stone-200 cursor-pointer"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  editForumReply(reply.id, editingReplyText);
+                                  setEditingReplyId(null);
+                                }}
+                                className="px-3 py-1 rounded-lg text-xs font-bold bg-[#E09F3E] text-white hover:bg-[#835500] cursor-pointer"
+                              >
+                                Guardar Cambios
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs sm:text-sm text-stone-700 leading-relaxed pl-10 whitespace-pre-line">
+                            {reply.content}
+                          </p>
                         )}
+
+                        {/* Reddit-style Upvote / Downvote Net Score Bar */}
+                        <div className="pl-10 flex items-center gap-1.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleForumReplyVote(reply.id, 'like')}
+                            title="Voto positivo / Like"
+                            className={`p-1 rounded-md transition-colors cursor-pointer flex items-center justify-center ${
+                              isRepUpvoted
+                                ? 'bg-[#FFDDB9] text-[#835500] font-bold'
+                                : 'text-stone-400 hover:text-[#835500] hover:bg-stone-200/60'
+                            }`}
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                          </button>
+
+                          <span
+                            className={`text-xs font-bold font-mono px-2 py-0.5 rounded-full select-none ${
+                              repScore > 0
+                                ? 'text-[#835500] bg-[#FFDDB9]/60 font-extrabold'
+                                : repScore < 0
+                                ? 'text-red-700 bg-red-100 font-extrabold'
+                                : 'text-stone-500 bg-stone-200/70'
+                            }`}
+                          >
+                            {repScore > 0 ? `+${repScore}` : repScore}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleForumReplyVote(reply.id, 'dislike')}
+                            title="Voto negativo / Dislike"
+                            className={`p-1 rounded-md transition-colors cursor-pointer flex items-center justify-center ${
+                              isRepDownvoted
+                                ? 'bg-red-100 text-red-700 font-bold'
+                                : 'text-stone-400 hover:text-red-600 hover:bg-stone-200/60'
+                            }`}
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-
-                      <p className="text-xs sm:text-sm text-[#333333] leading-relaxed mb-3">
-                        {reply.content}
-                      </p>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-stone-100 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => toggleForumReplyLike(reply.id)}
-                          className="flex items-center gap-1 text-stone-600 hover:text-[#835500] font-medium cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">thumb_up</span>
-                          <span>{reply.likesCount} me gusta</span>
-                        </button>
-
-                        {!reply.isBestAnswer &&
-                          (currentUser.id === activeTopic.authorId ||
-                            currentUser.role === 'admin' ||
-                            currentUser.role === 'editor') && (
-                            <button
-                              type="button"
-                              onClick={() => markBestAnswer(reply.id)}
-                              className="text-[11px] font-semibold text-[#835500] hover:underline cursor-pointer"
-                            >
-                              Marcar como mejor respuesta
-                            </button>
-                          )}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
 
                 {/* Reply Form */}
@@ -510,7 +675,7 @@ export const CommunityForumView: React.FC = () => {
             </div>
           </div>
 
-          {/* Widget: Chefs destacados del mes (RF-19 Seguir perfil) */}
+          {/* Widget: Chefs destacados del mes (Seguir perfil) */}
           <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100">
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">

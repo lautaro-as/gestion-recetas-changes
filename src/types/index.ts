@@ -78,7 +78,12 @@ export interface RecipeComment {
   authorAvatar: string;
   content: string;
   createdAt: string;
-  likes: number;
+  updatedAt?: string;
+  baseLikes?: number;
+  baseDislikes?: number;
+  likes?: number;
+  likedUserIds?: string[];
+  dislikedUserIds?: string[];
   parentCommentId?: string;
 }
 
@@ -156,6 +161,11 @@ export interface ForumTopic {
   viewsCount: number;
   tags: string[];
   isPinned?: boolean;
+  baseLikes?: number;
+  baseDislikes?: number;
+  likesCount?: number;
+  likedUserIds?: string[];
+  dislikedUserIds?: string[];
 }
 
 export interface ForumReply {
@@ -166,7 +176,12 @@ export interface ForumReply {
   authorAvatar: string;
   content: string;
   createdAt: string;
+  updatedAt?: string;
+  baseLikes?: number;
+  baseDislikes?: number;
   likesCount: number;
+  likedUserIds?: string[];
+  dislikedUserIds?: string[];
   isBestAnswer?: boolean;
 }
 
