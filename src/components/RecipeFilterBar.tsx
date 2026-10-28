@@ -83,7 +83,7 @@ export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar recetas por nombre, ingrediente, técnica o autor..."
+            placeholder="Buscar recetas por nombre o ingrediente, o buscar usuarios por alias (@usuario) o nombre..."
             className="w-full h-12 sm:h-13 pl-12 sm:pl-14 pr-10 rounded-full bg-[#f6f3f2] text-[#000000] placeholder:text-[#333333]/70 text-xs sm:text-sm focus:bg-white focus:ring-2 focus:ring-[#e09f3e] outline-none transition-all shadow-inner"
           />
           {searchQuery && (

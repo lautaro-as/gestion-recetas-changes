@@ -164,6 +164,23 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Icons & User Switcher */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Quick Search Button (RF-21) */}
+            <button
+              onClick={() => {
+                setActiveView('explorar');
+                setTimeout(() => {
+                  const input = document.getElementById('recipe-search');
+                  if (input) input.focus();
+                }, 50);
+              }}
+              aria-label="Buscar recetas o perfiles"
+              title="Buscar recetas o perfiles de usuario"
+              className="p-2 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer flex items-center justify-center"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[24px]">search</span>
+            </button>
+
             {/* Nueva Receta Button */}
             <button
               onClick={onOpenCreateRecipe}

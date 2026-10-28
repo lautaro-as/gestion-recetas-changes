@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Recipe, RecipeComment } from '../types';
+import { Recipe, RecipeComment, UserProfile } from '../types';
 import { useApp } from '../context/AppContext';
 import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
 import {
@@ -27,7 +27,8 @@ import {
   Sparkles,
   Store,
   Check,
-  Calendar
+  Calendar,
+  User
 } from 'lucide-react';
 
 interface RecipeDetailModalProps {
@@ -35,6 +36,7 @@ interface RecipeDetailModalProps {
   onClose: () => void;
   onEditRecipe: (recipe: Recipe) => void;
   onOpenReport: (recipe: Recipe) => void;
+  onOpenUserProfile?: (user: UserProfile) => void;
 }
 
 export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
@@ -42,10 +44,12 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   onClose,
   onEditRecipe,
   onOpenReport,
+  onOpenUserProfile,
 }) => {
   const {
     recipes,
     currentUser,
+    allUsers,
     toggleLikeRecipe,
     toggleDislikeRecipe,
     toggleWishlist,
@@ -278,26 +282,51 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
 
           {/* Author, Co-authors & Follow bar */}
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-3xl bg-[#FFDDB9]/30 border border-[#E09F3E]/30">
-            <div className="flex items-center gap-3">
-              <img
-                src={recipe.authorAvatar}
-                alt={recipe.authorName}
-                className="w-12 h-12 rounded-full object-cover border-2 border-[#E09F3E]"
-              />
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-stone-900 text-base">{recipe.authorName}</span>
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#FFDDB9] text-[#714500] font-bold">
-                    Autor
-                  </span>
-                </div>
-                {recipe.coAuthors.length > 0 && (
-                  <div className="text-xs text-stone-600 mt-0.5">
-                    Co-autoría con: <span className="font-semibold text-stone-800">{recipe.coAuthors.join(', ')}</span>
+            {(() => {
+              const authorUser = allUsers.find((u) => u.id === recipe.authorId);
+              return (
+                <div
+                  className={`flex items-center gap-3 ${onOpenUserProfile && authorUser ? 'cursor-pointer group' : ''}`}
+                  onClick={() => {
+                    if (onOpenUserProfile && authorUser) {
+                      onOpenUserProfile(authorUser);
+                    }
+                  }}
+                  title={authorUser ? `Ver perfil público de @${authorUser.username}` : undefined}
+                >
+                  <img
+                    src={recipe.authorAvatar}
+                    alt={recipe.authorName}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#E09F3E] group-hover:scale-105 transition-transform"
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-stone-900 text-base group-hover:text-[#835500] transition-colors">
+                        {recipe.authorName}
+                      </span>
+                      {authorUser && (
+                        <span className="text-xs text-[#865300] font-semibold">
+                          @{authorUser.username}
+                        </span>
+                      )}
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#FFDDB9] text-[#714500] font-bold">
+                        Autor
+                      </span>
+                      {onOpenUserProfile && authorUser && (
+                        <span className="text-[10px] text-[#835500] underline font-medium ml-1">
+                          (Ver perfil)
+                        </span>
+                      )}
+                    </div>
+                    {recipe.coAuthors.length > 0 && (
+                      <div className="text-xs text-stone-600 mt-0.5">
+                        Co-autoría con: <span className="font-semibold text-stone-800">{recipe.coAuthors.join(', ')}</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              );
+            })()}
 
             <div className="flex items-center gap-3">
               {recipe.authorId !== currentUser.id && (

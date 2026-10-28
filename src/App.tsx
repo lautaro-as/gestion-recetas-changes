@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { DietaryTag, Recipe } from './types';
+import { DietaryTag, Recipe, UserProfile } from './types';
 import { Navbar } from './components/Navbar';
 import { RecipeCard } from './components/RecipeCard';
 import { RecipeDetailModal } from './components/RecipeDetailModal';
@@ -20,6 +20,7 @@ import { ModerationAdminPanel } from './components/ModerationAdminPanel';
 import { PrintRecipeView } from './components/PrintRecipeView';
 import { AuthModals } from './components/AuthModals';
 import { ReportModal } from './components/ReportModal';
+import { PublicProfileModal } from './components/PublicProfileModal';
 import {
   Sparkles,
   ChefHat,
@@ -36,6 +37,9 @@ function AppContent() {
   const {
     recipes,
     currentUser,
+    allUsers,
+    selectSpecificUser,
+    followUserToggle,
     printableRecipe,
     setPrintableRecipe,
     selectSpecificUser,
@@ -57,6 +61,7 @@ function AppContent() {
 
   // Modals state
   const [selectedRecipeDetail, setSelectedRecipeDetail] = useState<Recipe | null>(null);
+  const [selectedUserProfile, setSelectedUserProfile] = useState<UserProfile | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -70,6 +75,20 @@ function AppContent() {
     id: string;
     title: string;
   }>({ type: 'recipe', id: '', title: '' });
+
+  // RF-21: Búsqueda de Perfiles por nombre de usuario o alias (@usuario)
+  const matchedUsers = useMemo(() => {
+    const rawQ = searchQuery.trim().toLowerCase();
+    if (!rawQ) return [];
+    const cleanQ = rawQ.replace(/^@/, '');
+    return allUsers.filter((u) => {
+      const matchUsername = u.username.toLowerCase().includes(cleanQ);
+      const matchAlias = `@${u.username.toLowerCase()}`.includes(rawQ);
+      const matchName = u.name.toLowerCase().includes(cleanQ);
+      const matchSpecialty = u.specialties.some((s) => s.toLowerCase().includes(cleanQ));
+      return matchUsername || matchAlias || matchName || matchSpecialty;
+    });
+  }, [allUsers, searchQuery]);
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -97,16 +116,25 @@ function AppContent() {
         return false;
       }
 
-      // Search query filter (keyword, ingredient, title)
+      // Search query filter (keyword, ingredient, title, or author name/alias)
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesTitle = recipe.title.toLowerCase().includes(q);
-        const matchesDesc = recipe.description.toLowerCase().includes(q);
+        const rawQ = searchQuery.toLowerCase().trim();
+        const cleanQ = rawQ.replace(/^@/, '');
+        const matchesTitle = recipe.title.toLowerCase().includes(cleanQ);
+        const matchesDesc = recipe.description.toLowerCase().includes(cleanQ);
         const matchesIngredient = recipe.ingredients.some((ing) =>
-          ing.name.toLowerCase().includes(q)
+          ing.name.toLowerCase().includes(cleanQ)
         );
-        const matchesAuthor = recipe.authorName.toLowerCase().includes(q);
-        if (!matchesTitle && !matchesDesc && !matchesIngredient && !matchesAuthor) {
+        const matchesAuthorName = recipe.authorName.toLowerCase().includes(cleanQ);
+
+        // Find if this recipe's author has a matching alias or username
+        const authorUser = allUsers.find((u) => u.id === recipe.authorId);
+        const matchesAuthorAlias = authorUser && (
+          authorUser.username.toLowerCase().includes(cleanQ) ||
+          `@${authorUser.username.toLowerCase()}`.includes(rawQ)
+        );
+
+        if (!matchesTitle && !matchesDesc && !matchesIngredient && !matchesAuthorName && !matchesAuthorAlias) {
           return false;
         }
       }
@@ -141,7 +169,7 @@ function AppContent() {
       if (sortBy === 'calories') return a.nutrition.calories - b.nutrition.calories;
       return 0;
     });
-  }, [recipes, searchQuery, selectedCategory, selectedTags, selectedDifficulty, maxTime, sortBy, currentUser]);
+  }, [recipes, searchQuery, selectedCategory, selectedTags, selectedDifficulty, maxTime, sortBy, currentUser, allUsers]);
 
   const handleOpenReport = (type: 'recipe' | 'profile', id: string, title: string) => {
     setReportTarget({ type, id, title });
@@ -228,6 +256,116 @@ function AppContent() {
               onClearFilters={handleClearFilters}
             />
 
+            {/* RF-21: Perfiles de Usuario Encontrados por Nombre de Usuario o Alias */}
+            {matchedUsers.length > 0 && (
+              <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#E09F3E]/40 shadow-[0_4px_24px_-4px_rgba(197,130,38,0.12)] space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-2xl bg-[#FFDDB9] text-[#835500] flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[22px]">person_search</span>
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-sm sm:text-base text-stone-900 font-display">
+                          Perfiles encontrados ({matchedUsers.length})
+                        </h3>
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold bg-[#FFDDB9] text-[#714500] px-2 py-0.5 rounded-full">
+                          RF-21
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone-500">
+                        Búsqueda de usuarios por alias (@{searchQuery.replace(/^@/, '')}) o nombre
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-[#835500] font-semibold hidden sm:inline">
+                    Haz clic en "Entrar al perfil" para ver su biografía y recetas
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {matchedUsers.map((user) => {
+                    const isFollowing = currentUser.followingUserIds.includes(user.id);
+                    const userRecipeCount = recipes.filter(
+                      (r) => r.authorId === user.id && r.status === 'published'
+                    ).length;
+
+                    return (
+                      <div
+                        key={user.id}
+                        className="p-4 rounded-2xl bg-stone-50 hover:bg-[#FFFDF9] border border-stone-200 hover:border-[#E09F3E] transition-all flex flex-col justify-between gap-3 group shadow-2xs"
+                      >
+                        <div
+                          className="flex items-center gap-3 cursor-pointer"
+                          onClick={() => setSelectedUserProfile(user)}
+                        >
+                          <img
+                            src={user.avatar}
+                            alt={user.name}
+                            className="w-13 h-13 rounded-full object-cover ring-2 ring-[#E09F3E]/40 group-hover:scale-105 transition-transform shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="font-bold text-sm text-stone-900 truncate group-hover:text-[#835500] transition-colors">
+                                {user.name}
+                              </h4>
+                              <span
+                                className="material-symbols-outlined text-[#835500] text-[16px] shrink-0"
+                                style={{ fontVariationSettings: "'FILL' 1" }}
+                              >
+                                verified
+                              </span>
+                            </div>
+                            <p className="text-xs font-bold text-[#865300] truncate">
+                              @{user.username}
+                            </p>
+                            <div className="flex items-center gap-2 text-[11px] text-stone-500 mt-0.5">
+                              <span className="capitalize">{user.role}</span>
+                              <span>•</span>
+                              <span>{userRecipeCount} recetas</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {user.bio && (
+                          <p className="text-xs text-stone-600 line-clamp-2">
+                            {user.bio}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2.5 border-t border-stone-200/60 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUserProfile(user)}
+                            className="inline-flex items-center gap-1.5 bg-[#835500] hover:bg-[#5A3900] text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-xs transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">account_circle</span>
+                            <span>Entrar al perfil</span>
+                          </button>
+
+                          {user.id !== currentUser.id ? (
+                            <button
+                              type="button"
+                              onClick={() => followUserToggle(user.id)}
+                              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                                isFollowing
+                                  ? 'bg-stone-200 text-stone-800 hover:bg-stone-300'
+                                  : 'bg-[#FFDDB9] text-[#714500] hover:bg-[#E09F3E] hover:text-white'
+                              }`}
+                            >
+                              {isFollowing ? 'Siguiendo' : '+ Seguir'}
+                            </button>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-stone-400">Tu cuenta</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Recipe Grid */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -246,10 +384,16 @@ function AppContent() {
 
               {filteredRecipes.length === 0 ? (
                 <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-3">
-                  <span className="material-symbols-outlined text-[48px] text-stone-300">dinner_dining</span>
-                  <h3 className="font-bold text-stone-800 text-base">No se encontraron recetas</h3>
-                  <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                    Prueba ajustando los filtros dietéticos, ampliando el tiempo de cocción o buscando otros ingredientes.
+                  <span className="material-symbols-outlined text-[48px] text-stone-300">search_off</span>
+                  <h3 className="font-bold text-stone-800 text-base">
+                    {searchQuery.trim()
+                      ? `No se encontraron recetas para "${searchQuery}"`
+                      : 'No se encontraron recetas con los filtros seleccionados'}
+                  </h3>
+                  <p className="text-xs text-stone-500 max-w-md mx-auto">
+                    {searchQuery.trim()
+                      ? 'Prueba buscando por ingredientes, técnicas o busca cocineros por su alias (@mateochef, @lucianutri, @camicocina).'
+                      : 'Prueba ajustando los filtros dietéticos, ampliando el tiempo de cocción o limpiando los filtros.'}
                   </p>
                   <button
                     onClick={handleClearFilters}
@@ -266,6 +410,7 @@ function AppContent() {
                       recipe={recipe}
                       onOpenDetail={(r) => setSelectedRecipeDetail(r)}
                       onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}
+                      onOpenUserProfile={(u) => setSelectedUserProfile(u)}
                     />
                   ))}
                 </div>
@@ -312,6 +457,7 @@ function AppContent() {
             onOpenReport={handleOpenReport}
             onEditRecipe={handleEditRecipe}
             onCreateRecipe={handleCreateNewRecipe}
+            onViewUserProfile={(u) => setSelectedUserProfile(u)}
           />
         )}
 
@@ -397,6 +543,15 @@ function AppContent() {
         onClose={() => setSelectedRecipeDetail(null)}
         onEditRecipe={handleEditRecipe}
         onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}
+        onOpenUserProfile={(u) => setSelectedUserProfile(u)}
+      />
+
+      <PublicProfileModal
+        user={allUsers.find((u) => u.id === selectedUserProfile?.id) || selectedUserProfile}
+        onClose={() => setSelectedUserProfile(null)}
+        onOpenRecipeDetail={(r) => setSelectedRecipeDetail(r)}
+        onOpenReport={handleOpenReport}
+        onSwitchUser={(userId) => selectSpecificUser(userId)}
       />
 
       <RecipeEditorModal

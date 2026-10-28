@@ -11,6 +11,7 @@ interface UserProfileViewProps {
   onOpenReport: (targetType: 'recipe' | 'profile', targetId: string, title: string) => void;
   onEditRecipe: (recipe: Recipe) => void;
   onCreateRecipe: () => void;
+  onViewUserProfile?: (user: UserProfile) => void;
 }
 
 export const UserProfileView: React.FC<UserProfileViewProps> = ({
@@ -18,6 +19,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   onOpenReport,
   onEditRecipe,
   onCreateRecipe,
+  onViewUserProfile,
 }) => {
   const {
     currentUser,
@@ -68,12 +70,16 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   // Pinned recipe if exists
   const pinnedRecipe = recipes.find((r) => r.id === currentUser.pinnedRecipeId);
 
-  // Profile search
+  // Profile search (RF-21: Búsqueda por nombre de usuario, alias o especialidad)
+  const cleanProfileQuery = profileSearchQuery.trim().toLowerCase().replace(/^@/, '');
+  const rawProfileQuery = profileSearchQuery.trim().toLowerCase();
   const filteredUsers = allUsers.filter((u) => {
+    if (!cleanProfileQuery) return true;
     return (
-      u.name.toLowerCase().includes(profileSearchQuery.toLowerCase()) ||
-      u.username.toLowerCase().includes(profileSearchQuery.toLowerCase()) ||
-      u.specialties.some((s) => s.toLowerCase().includes(profileSearchQuery.toLowerCase()))
+      u.username.toLowerCase().includes(cleanProfileQuery) ||
+      `@${u.username.toLowerCase()}`.includes(rawProfileQuery) ||
+      u.name.toLowerCase().includes(cleanProfileQuery) ||
+      u.specialties.some((s) => s.toLowerCase().includes(cleanProfileQuery))
     );
   });
 
@@ -194,7 +200,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3 pt-3 border-t border-stone-100">
                 <div className="flex flex-col">
                   <span className="text-lg font-bold text-[#1B1C1C]">
-                    {currentUser.followersCount || 1420}
+                    {currentUser.followersCount ?? 0}
                   </span>
                   <span className="text-[10px] text-[#514536] uppercase tracking-wider font-semibold">
                     Seguidores
@@ -202,7 +208,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 </div>
                 <div className="flex flex-col">
                   <span className="text-lg font-bold text-[#1B1C1C]">
-                    {currentUser.followingUserIds.length || 12}
+                    {currentUser.followingUserIds?.length ?? 0}
                   </span>
                   <span className="text-[10px] text-[#514536] uppercase tracking-wider font-semibold">
                     Seguidos
@@ -908,46 +914,73 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   key={user.id}
                   className="bg-white rounded-3xl p-5 shadow-sm border border-stone-200/60 flex flex-col justify-between"
                 >
-                  <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className={`flex items-center gap-3 mb-3 ${onViewUserProfile ? 'cursor-pointer group' : ''}`}
+                    onClick={() => onViewUserProfile && onViewUserProfile(user)}
+                  >
                     <img
                       src={user.avatar}
                       alt={user.name}
-                      className="w-12 h-12 rounded-full object-cover ring-2 ring-[#E09F3E]/40"
+                      className="w-12 h-12 rounded-full object-cover ring-2 ring-[#E09F3E]/40 group-hover:scale-105 transition-transform shrink-0"
                     />
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-sm text-[#1B1C1C] truncate">{user.name}</h4>
-                      <p className="text-xs text-[#865300] truncate">@{user.username}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-bold text-sm text-[#1B1C1C] truncate group-hover:text-[#835500] transition-colors">
+                          {user.name}
+                        </h4>
+                        <span
+                          className="material-symbols-outlined text-[#835500] text-[16px] shrink-0"
+                          style={{ fontVariationSettings: "'FILL' 1" }}
+                        >
+                          verified
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-[#865300] truncate">@{user.username}</p>
                       <span className="text-[10px] text-stone-400 capitalize">{user.role}</span>
                     </div>
                   </div>
 
                   <p className="text-xs text-stone-600 line-clamp-2 mb-3">{user.bio}</p>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-stone-100">
-                    {user.id !== currentUser.id ? (
-                      <button
-                        type="button"
-                        onClick={() => followUserToggle(user.id)}
-                        className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                          isFollowing
-                            ? 'bg-[#FFDDB9] text-[#2B1700]'
-                            : 'bg-[#835500] text-white hover:bg-[#865300]'
-                        }`}
-                      >
-                        {isFollowing ? 'Siguiendo' : 'Seguir'}
-                      </button>
-                    ) : (
-                      <span className="text-xs font-bold text-stone-400">Tu cuenta actual</span>
-                    )}
+                  <div className="flex items-center justify-between pt-3 border-t border-stone-100 gap-2">
+                    <div className="flex items-center gap-2">
+                      {onViewUserProfile && (
+                        <button
+                          type="button"
+                          onClick={() => onViewUserProfile(user)}
+                          className="px-3.5 py-1.5 rounded-full bg-[#E09F3E] text-white hover:bg-[#835500] text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">account_circle</span>
+                          <span>Ver perfil</span>
+                        </button>
+                      )}
+
+                      {user.id !== currentUser.id ? (
+                        <button
+                          type="button"
+                          onClick={() => followUserToggle(user.id)}
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                            isFollowing
+                              ? 'bg-[#FFDDB9] text-[#2B1700]'
+                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                          }`}
+                        >
+                          {isFollowing ? 'Siguiendo' : '+ Seguir'}
+                        </button>
+                      ) : (
+                        <span className="text-xs font-bold text-stone-400">Tu cuenta actual</span>
+                      )}
+                    </div>
 
                     {user.id !== currentUser.id && (
                       <button
                         type="button"
                         onClick={() => onOpenReport('profile', user.id, user.name)}
-                        className="text-[11px] text-[#AB3333] hover:underline flex items-center gap-0.5"
+                        className="text-[11px] text-[#AB3333] hover:underline flex items-center gap-0.5 cursor-pointer"
+                        title="Denunciar perfil"
                       >
                         <span className="material-symbols-outlined text-[14px]">flag</span>
-                        <span>Denunciar</span>
+                        <span className="hidden sm:inline">Denunciar</span>
                       </button>
                     )}
                   </div>
