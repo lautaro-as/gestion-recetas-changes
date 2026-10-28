@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Recipe, RecipeComment } from '../types';
 import { useApp } from '../context/AppContext';
+import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
 import {
   X,
   Clock,
@@ -72,6 +73,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   const [editingCommentText, setEditingCommentText] = useState('');
   const [selectedIngredientIds, setSelectedIngredientIds] = useState<string[]>([]);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   if (!initialRecipe) return null;
   const recipe = recipes.find((r) => r.id === initialRecipe.id) || initialRecipe;
@@ -128,10 +130,14 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar permanentemente la receta "${recipe.title}"?`)) {
-      if (deleteRecipe(recipe.id)) {
-        onClose();
-      }
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    const success = deleteRecipe(recipe.id);
+    setIsDeleteModalOpen(false);
+    if (success) {
+      onClose();
     }
   };
 
@@ -981,6 +987,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      <ConfirmDeleteRecipeModal
+        isOpen={isDeleteModalOpen}
+        recipeTitle={recipe.title}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+      />
     </div>
   );
 };

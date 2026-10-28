@@ -828,6 +828,53 @@ export const INITIAL_RECIPES: Recipe[] = [
         durationMinutes: 25
       }
     ]
+  },
+  {
+    id: 'rec-spam-example',
+    title: 'Receta Mágica Quemagrasas en 24 Horas sin Esfuerzo',
+    description: 'Píldoras y menjunje milagroso para acelerar el metabolismo sin ejercicio ni cambios dietéticos. Enlaces a suplementos dudosos.',
+    coverImage: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80',
+    authorId: 'user-fake-chef',
+    authorName: 'bot_suplementos99',
+    authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80',
+    coAuthors: [],
+    status: 'published',
+    createdAt: '2026-10-03T18:00:00.000Z',
+    updatedAt: '2026-10-03T18:00:00.000Z',
+    prepTimeMin: 5,
+    cookTimeMin: 0,
+    servings: 1,
+    difficulty: 'facil',
+    category: 'desayunos',
+    tags: ['bajo_sodio'],
+    nutrition: { calories: 50, proteinG: 0, carbsG: 1, fatG: 0, fiberG: 0 },
+    likesCount: 0,
+    dislikesCount: 15,
+    likedUserIds: [],
+    dislikedUserIds: ['user-mateo', 'user-lucia'],
+    commentsCount: 0,
+    ingredients: [
+      {
+        id: 'ing-spam-1',
+        name: 'Suplemento quemador no regulado',
+        quantity: 1,
+        unit: 'cucharada',
+        estimatedPrice: 45.0,
+        storeName: 'Enlace Externo Dudoso',
+        storeLocation: 'Sitio Web Desconocido',
+        inStock: false,
+        stockLevel: 'bajo',
+        category: 'otros'
+      }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: 'Mezcla y compra externa',
+        description: 'Ingerir en ayunas y seguir el link externo sospechoso para adquirir más frascos.',
+        durationMinutes: 5
+      }
+    ]
   }
 ];
 

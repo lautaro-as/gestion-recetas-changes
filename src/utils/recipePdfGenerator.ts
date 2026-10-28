@@ -3,7 +3,7 @@ import { Recipe } from '../types';
 
 /**
  * Generates and downloads a clean, beautifully formatted "Quick-Read Digital PDF"
- * for an individual recipe (RF-29).
+ * for an individual recipe.
  */
 export const downloadRecipePdf = (recipe: Recipe): void => {
   const doc = new jsPDF({

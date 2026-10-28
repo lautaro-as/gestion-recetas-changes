@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Recipe } from '../types';
 import { useApp } from '../context/AppContext';
+import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -15,6 +16,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 }) => {
   const {
     currentUser,
+    deleteRecipe,
     toggleLikeRecipe,
     toggleDislikeRecipe,
     toggleWishlist,
@@ -30,6 +32,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const isLiked = recipe.likedUserIds.includes(currentUser.id);
   const isDisliked = recipe.dislikedUserIds.includes(currentUser.id);
@@ -37,6 +40,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   const isComparing = comparingRecipeIds.includes(recipe.id);
   const isAuthor = recipe.authorId === currentUser.id;
   const canPin = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
+  const canDelete = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
 
   const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
 
@@ -321,6 +325,20 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     </button>
                   )}
 
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setIsDeleteModalOpen(true);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-red-50 flex items-center gap-2 text-red-600 font-medium border-t border-stone-100"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      <span>Eliminar receta</span>
+                    </button>
+                  )}
+
                   {onOpenReport && (
                     <button
                       type="button"
@@ -340,6 +358,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           </div>
         </div>
       </div>
+
+      <ConfirmDeleteRecipeModal
+        isOpen={isDeleteModalOpen}
+        recipeTitle={recipe.title}
+        onConfirm={() => {
+          deleteRecipe(recipe.id);
+          setIsDeleteModalOpen(false);
+        }}
+        onCancel={() => setIsDeleteModalOpen(false)}
+      />
     </article>
   );
 };

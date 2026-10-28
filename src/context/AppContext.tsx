@@ -144,11 +144,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!saved) return INITIAL_RECIPES;
     try {
       const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_RECIPES;
-      // Ensure seed scheduled recipes are merged if user had older localStorage
-      const existingIds = new Set(parsed.map((r: Recipe) => r.id));
-      const missing = INITIAL_RECIPES.filter(r => !existingIds.has(r.id));
-      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+      if (!Array.isArray(parsed)) return INITIAL_RECIPES;
+      return parsed;
     } catch {
       return INITIAL_RECIPES;
     }
@@ -182,11 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!saved) return INITIAL_REPORTS;
     try {
       const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_REPORTS;
-      const hasPending = parsed.some((r: ModerationReport) => r.status === 'pending');
-      if (!hasPending) {
-        return [...INITIAL_REPORTS.filter(ir => ir.status === 'pending'), ...parsed];
-      }
+      if (!Array.isArray(parsed)) return INITIAL_REPORTS;
       return parsed;
     } catch {
       return INITIAL_REPORTS;
@@ -455,7 +448,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteRecipe = (id: string) => {
     const target = recipes.find(r => r.id === id);
-    if (!target) return false;
+    if (!target) {
+      showToast('La receta solicitada no existe o ya ha sido eliminada.');
+      return false;
+    }
 
     // Check permissions: author, editor, or admin
     const canDelete = currentUser.role === 'admin' || currentUser.role === 'editor' || target.authorId === currentUser.id;
@@ -464,10 +460,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
+    // 1. Remove recipe from state
     setRecipes(prev => prev.filter(r => r.id !== id));
-    // Also remove from cart, collections, compare
+    // 2. Remove ingredients from shopping cart
     setCart(prev => prev.filter(c => c.recipeId !== id));
+    // 3. Remove from compare list
     setComparingRecipeIds(prev => prev.filter(cid => cid !== id));
+    // 4. Remove comments belonging to this recipe
+    setComments(prev => prev.filter(c => c.recipeId !== id));
+    // 5. Remove from collections
+    setCollections(prev => prev.map(col => ({
+      ...col,
+      recipeIds: col.recipeIds.filter(rid => rid !== id)
+    })));
+    // 6. Remove from users' pinned recipe and wishlists
+    setUsers(prev => prev.map(u => ({
+      ...u,
+      pinnedRecipeId: u.pinnedRecipeId === id ? undefined : u.pinnedRecipeId,
+      wishlistRecipeIds: u.wishlistRecipeIds.filter(wid => wid !== id)
+    })));
+    // 7. Clear printable recipe if it's the deleted one
+    setPrintableRecipe(prev => prev?.id === id ? null : prev);
+    // 8. Update any pending moderation reports for this recipe
+    setReports(prev => prev.map(rep => {
+      if (rep.targetType === 'recipe' && rep.targetId === id && rep.status === 'pending') {
+        return { ...rep, status: 'resolved_removed' };
+      }
+      return rep;
+    }));
+
     showToast(`Receta "${target.title}" eliminada con éxito.`);
     return true;
   };
@@ -775,9 +796,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const report = reports.find(r => r.id === reportId);
     if (!report) return;
 
+    // Permissions: admin or editor
+    if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
+      showToast('No tienes permisos de moderación para realizar esta acción.');
+      return;
+    }
+
     if (resolution === 'removed') {
       if (report.targetType === 'recipe') {
-        setRecipes(prev => prev.filter(r => r.id !== report.targetId));
+        const recipeId = report.targetId;
+        // Cascade delete recipe
+        setRecipes(prev => prev.filter(r => r.id !== recipeId));
+        setCart(prev => prev.filter(c => c.recipeId !== recipeId));
+        setComparingRecipeIds(prev => prev.filter(cid => cid !== recipeId));
+        setComments(prev => prev.filter(c => c.recipeId !== recipeId));
+        setCollections(prev => prev.map(col => ({
+          ...col,
+          recipeIds: col.recipeIds.filter(rid => rid !== recipeId)
+        })));
+        setUsers(prev => prev.map(u => ({
+          ...u,
+          pinnedRecipeId: u.pinnedRecipeId === recipeId ? undefined : u.pinnedRecipeId,
+          wishlistRecipeIds: u.wishlistRecipeIds.filter(wid => wid !== recipeId)
+        })));
+        setPrintableRecipe(prev => prev?.id === recipeId ? null : prev);
       } else {
         setUsers(prev => prev.map(u => u.id === report.targetId ? { ...u, isBanned: true } : u));
       }
@@ -788,7 +830,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: resolution === 'removed' ? 'resolved_removed' : 'dismissed'
     } : r));
 
-    showToast(resolution === 'removed' ? 'Elemento retirado y reporte marcado como resuelto.' : 'Reporte desestimado.');
+    showToast(
+      resolution === 'removed'
+        ? (report.targetType === 'recipe' ? `Receta "${report.targetTitleOrName}" eliminada de la plataforma.` : 'Perfil suspendido y reporte resuelto.')
+        : 'Reporte desestimado: el contenido se mantendrá activo.'
+    );
   };
 
   // Forum

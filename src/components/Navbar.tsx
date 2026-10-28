@@ -48,6 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const roleBadge = getRoleBadge(currentUser.role);
+  const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
 
   return (
     <header className="sticky top-0 left-0 w-full z-50">
@@ -145,7 +146,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Mi espacio
               </button>
 
-              {currentUser.role === 'admin' && (
+              {isStaff && (
                 <button
                   onClick={() => setActiveView('moderacion')}
                   className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
@@ -409,7 +410,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Mi espacio
           </button>
-          {currentUser.role === 'admin' && (
+          {isStaff && (
             <button
               onClick={() => setActiveView('moderacion')}
               className={`px-3 py-1 rounded-full transition-all shrink-0 ${

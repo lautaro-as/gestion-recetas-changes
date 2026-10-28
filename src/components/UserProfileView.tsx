@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import { Recipe, UserProfile, DietaryTag, SubProfile } from '../types';
 import { RecipeCard } from './RecipeCard';
 import { ScrollableFilterBar } from './ScrollableFilterBar';
+import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
+import { Trash2 } from 'lucide-react';
 
 interface UserProfileViewProps {
   onOpenDetail: (recipe: Recipe) => void;
@@ -21,6 +23,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     currentUser,
     allUsers,
     recipes,
+    deleteRecipe,
     collections,
     createCollection,
     exportCollectionPackage,
@@ -37,6 +40,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   >('creadas');
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
 
   // Edit profile state
   const [name, setName] = useState(currentUser.name);
@@ -665,17 +669,27 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onEditRecipe(recipe)}
-                      className="px-4 py-1.5 rounded-full bg-[#E09F3E] text-white text-xs font-bold shadow-xs hover:bg-[#835500]"
+                      className="px-4 py-1.5 rounded-full bg-[#E09F3E] text-white text-xs font-bold shadow-xs hover:bg-[#835500] cursor-pointer"
                     >
                       Continuar editando
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onOpenDetail(recipe)}
-                      className="text-xs font-semibold text-stone-500 hover:text-stone-900"
-                    >
-                      Previsualizar
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onOpenDetail(recipe)}
+                        className="text-xs font-semibold text-stone-500 hover:text-stone-900 px-2 py-1 cursor-pointer"
+                      >
+                        Previsualizar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRecipeToDelete(recipe)}
+                        title="Eliminar borrador"
+                        className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -982,6 +996,18 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
           </div>
         </div>
       </div>
+
+      <ConfirmDeleteRecipeModal
+        isOpen={!!recipeToDelete}
+        recipeTitle={recipeToDelete?.title || ''}
+        onConfirm={() => {
+          if (recipeToDelete) {
+            deleteRecipe(recipeToDelete.id);
+            setRecipeToDelete(null);
+          }
+        }}
+        onCancel={() => setRecipeToDelete(null)}
+      />
     </div>
   );
 };

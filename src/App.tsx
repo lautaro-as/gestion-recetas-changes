@@ -38,8 +38,11 @@ function AppContent() {
     currentUser,
     printableRecipe,
     setPrintableRecipe,
+    selectSpecificUser,
     toast,
   } = useApp();
+
+  const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
 
   // Navigation view: 'explorar' | 'destacadas' | 'foro' | 'comparar' | 'perfil' | 'moderacion'
   const [activeView, setActiveView] = useState<string>('explorar');
@@ -314,8 +317,8 @@ function AppContent() {
 
         {/* VIEW 6: Panel de Moderación */}
         {activeView === 'moderacion' && (
-          currentUser.role === 'admin' ? (
-            <ModerationAdminPanel />
+          isStaff ? (
+            <ModerationAdminPanel onOpenDetail={(r) => setSelectedRecipeDetail(r)} />
           ) : (
             <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-4 max-w-lg mx-auto my-12 shadow-sm">
               <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
@@ -323,14 +326,31 @@ function AppContent() {
               </div>
               <h2 className="font-bold text-stone-900 text-xl font-display">Acceso Restringido</h2>
               <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-                El panel de moderación está reservado exclusivamente para cuentas con rol de <strong>Administrador</strong>.
+                El panel de moderación está reservado exclusivamente para cuentas de moderación con rol de <strong>Administrador o Editor</strong>.
               </p>
               <p className="text-xs text-stone-400">
-                Puedes cambiar a la cuenta de Administrador (Ignacio Gómez) usando el menú superior de usuario.
+                Puedes cambiar rápidamente a una cuenta de moderación para auditar la plataforma:
               </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => selectSpecificUser('user-ignacio')}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#835500] hover:bg-[#5a3900] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cambiar a Ignacio (Admin)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectSpecificUser('user-lucia')}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#e09f3e] hover:bg-[#c58529] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cambiar a Lucía (Editora)
+                </button>
+              </div>
               <button
+                type="button"
                 onClick={() => setActiveView('explorar')}
-                className="px-6 py-2.5 bg-[#E09F3E] text-white rounded-full text-xs font-bold hover:bg-[#835500] transition-colors cursor-pointer"
+                className="mt-3 text-xs text-stone-500 hover:text-stone-800 underline cursor-pointer"
               >
                 Volver a Explorar
               </button>
@@ -358,7 +378,7 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-4 text-xs">
             <span className="text-[#514536]">Plataforma Gastronómica de Recetas</span>
-            {currentUser.role === 'admin' && (
+            {isStaff && (
               <button
                 onClick={() => setActiveView('moderacion')}
                 className="inline-flex items-center gap-1.5 text-xs text-[#333333] hover:text-[#000000] font-medium transition-colors cursor-pointer"
