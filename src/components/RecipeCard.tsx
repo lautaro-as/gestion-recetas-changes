@@ -23,6 +23,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     addRecipeIngredientsToCart,
     togglePinRecipe,
     setPrintableRecipe,
+    exportRecipePdf,
     exportRecipeText,
     publishScheduledNow,
   } = useApp();
@@ -297,13 +298,13 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      exportRecipeText(recipe);
+                      exportRecipePdf(recipe);
                       setMenuOpen(false);
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-stone-50 flex items-center gap-2 text-stone-700"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-stone-600">download</span>
-                    <span>Descargar texto</span>
+                    <span className="material-symbols-outlined text-[16px] text-stone-600">picture_as_pdf</span>
+                    <span>Descargar receta (PDF)</span>
                   </button>
 
                   {recipe.status === 'scheduled' && isAuthor && (

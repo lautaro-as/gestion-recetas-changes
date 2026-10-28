@@ -59,6 +59,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
     toggleCommentVote,
     followUserToggle,
     setPrintableRecipe,
+    exportRecipePdf,
     exportRecipeJson,
     exportRecipeText,
     showToast
@@ -193,8 +194,8 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
             </button>
 
             <button
-              onClick={() => exportRecipeJson(recipe)}
-              title="Exportar receta JSON"
+              onClick={() => exportRecipePdf(recipe)}
+              title="Descargar receta en formato PDF (Lectura rápida)"
               className="p-2 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
             >
               <Download className="w-4 h-4" />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Recipe } from '../types';
-import { Printer, ArrowLeft, Clock, Users, Flame, ChefHat } from 'lucide-react';
+import { Printer, ArrowLeft, Clock, Users, Flame, ChefHat, Download } from 'lucide-react';
+import { downloadRecipePdf } from '../utils/recipePdfGenerator';
 
 interface PrintRecipeViewProps {
   recipe: Recipe;
@@ -31,13 +32,23 @@ export const PrintRecipeView: React.FC<PrintRecipeViewProps> = ({
           Vista previa de impresión limpia optimizada
         </div>
 
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
-        >
-          <Printer className="w-4 h-4" />
-          Imprimir Ahora (PDF / Papel)
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => downloadRecipePdf(recipe)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-stone-300"
+          >
+            <Download className="w-4 h-4 text-stone-600" />
+            Descargar PDF
+          </button>
+
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors cursor-pointer"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir Ahora (Papel / Sistema)
+          </button>
+        </div>
       </div>
 
       {/* Printable Sheet (Standard A4 / Editorial Paper Style) */}

@@ -24,6 +24,7 @@ import {
   INITIAL_COLLECTIONS,
   INITIAL_NOTIFICATIONS
 } from '../data/seedData';
+import { downloadRecipePdf } from '../utils/recipePdfGenerator';
 
 interface AppContextType {
   // Authentication & Users
@@ -101,6 +102,7 @@ interface AppContextType {
   // Print & Export
   printableRecipe: Recipe | null;
   setPrintableRecipe: (recipe: Recipe | null) => void;
+  exportRecipePdf: (recipe: Recipe) => void;
   exportRecipeJson: (recipe: Recipe) => void;
   exportRecipeText: (recipe: Recipe) => void;
   exportCollectionPackage: (collection: RecipeCollection) => void;
@@ -913,6 +915,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Exporting & Printing
+  const exportRecipePdf = (recipe: Recipe) => {
+    try {
+      downloadRecipePdf(recipe);
+      showToast(`Receta "${recipe.title}" descargada en formato PDF.`);
+    } catch (err) {
+      console.error('Error al generar PDF:', err);
+      showToast('Error al generar el PDF de la receta.');
+    }
+  };
+
   const exportRecipeJson = (recipe: Recipe) => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(recipe, null, 2));
     const downloadAnchor = document.createElement('a');
@@ -1049,6 +1061,7 @@ Gusto - Sistema de Gestión de Recetas.
 
         printableRecipe,
         setPrintableRecipe,
+        exportRecipePdf,
         exportRecipeJson,
         exportRecipeText,
         exportCollectionPackage,
