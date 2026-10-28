@@ -83,8 +83,18 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   const recipe = recipes.find((r) => r.id === initialRecipe.id) || initialRecipe;
 
   const isAuthor = recipe.authorId === currentUser.id;
-  const canEdit = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
-  const canDelete = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
+  const isCoAuthor = Boolean(
+    recipe.coAuthors &&
+      recipe.coAuthors.some(
+        (ca) =>
+          ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+          ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
+          (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
+      )
+  );
+  const isStaff = currentUser.role === 'editor' || currentUser.role === 'admin';
+  const canEdit = isAuthor || isCoAuthor || isStaff;
+  const canDelete = isAuthor || isStaff;
   const isFollowingAuthor = currentUser.followingUserIds.includes(recipe.authorId);
   const isLiked = recipe.likedUserIds.includes(currentUser.id);
   const isDisliked = recipe.dislikedUserIds.includes(currentUser.id);

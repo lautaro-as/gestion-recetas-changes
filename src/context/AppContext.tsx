@@ -44,7 +44,7 @@ interface AppContextType {
   // Recipes
   recipes: Recipe[];
   createRecipe: (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'dislikesCount' | 'likedUserIds' | 'dislikedUserIds' | 'commentsCount'>) => string;
-  updateRecipe: (id: string, recipeData: Partial<Recipe>) => void;
+  updateRecipe: (id: string, recipeData: Partial<Recipe>) => boolean;
   deleteRecipe: (id: string) => boolean;
   togglePinRecipe: (recipeId: string) => void;
   toggleLikeRecipe: (recipeId: string) => void;
@@ -441,9 +441,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newId;
   };
 
-  const updateRecipe = (id: string, recipeData: Partial<Recipe>) => {
-    setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...recipeData, updatedAt: new Date().toISOString() } : r));
-    showToast('Receta actualizada correctamente.');
+  const updateRecipe = (id: string, recipeData: Partial<Recipe>): boolean => {
+    const target = recipes.find(r => r.id === id);
+    if (!target) {
+      showToast('La receta que intentas modificar no existe o ha sido eliminada.');
+      return false;
+    }
+
+    // Permission validation: author, co-author, editor, or admin
+    const isAuthor = target.authorId === currentUser.id;
+    const isCoAuthor = Boolean(target.coAuthors && target.coAuthors.some(ca =>
+      ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+      ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
+      (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
+    ));
+    const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
+    const canEdit = isAuthor || isCoAuthor || isStaff;
+
+    if (!canEdit) {
+      showToast('No tienes permisos suficientes para modificar esta receta.');
+      return false;
+    }
+
+    // Status & integrity restrictions
+    let sanitizedData = { ...recipeData };
+
+    if (target.status === 'published') {
+      // Published recipe restrictions:
+      // Preserve original author identity, publication timestamp, and community metrics
+      sanitizedData = {
+        ...sanitizedData,
+        authorId: target.authorId,
+        authorName: target.authorName,
+        authorAvatar: target.authorAvatar,
+        createdAt: target.createdAt,
+        likesCount: target.likesCount,
+        dislikesCount: target.dislikesCount,
+        likedUserIds: target.likedUserIds,
+        dislikedUserIds: target.dislikedUserIds,
+        commentsCount: target.commentsCount,
+        // Published recipes maintain published status unless staff explicitly changes it
+        status: isStaff && sanitizedData.status ? sanitizedData.status : 'published'
+      };
+    }
+
+    setRecipes(prev => prev.map(r => r.id === id ? {
+      ...r,
+      ...sanitizedData,
+      updatedAt: new Date().toISOString()
+    } : r));
+
+    if (target.status === 'draft') {
+      if (sanitizedData.status === 'published') {
+        showToast(`¡Borrador "${sanitizedData.title || target.title}" publicado con éxito en el catálogo!`);
+      } else if (sanitizedData.status === 'scheduled') {
+        showToast(`Borrador "${sanitizedData.title || target.title}" programado para publicación automática.`);
+      } else {
+        showToast(`Borrador "${sanitizedData.title || target.title}" guardado correctamente.`);
+      }
+    } else {
+      showToast(`Receta "${sanitizedData.title || target.title}" actualizada correctamente.`);
+    }
+
+    return true;
   };
 
   const deleteRecipe = (id: string) => {

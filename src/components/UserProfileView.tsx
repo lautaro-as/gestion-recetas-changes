@@ -624,6 +624,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   recipe={recipe}
                   onOpenDetail={onOpenDetail}
                   onOpenReport={(r) => onOpenReport('recipe', r.id, r.title)}
+                  onEditRecipe={onEditRecipe}
                 />
               ))}
             </div>
@@ -758,6 +759,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     recipe={recipe}
                     onOpenDetail={onOpenDetail}
                     onOpenReport={(r) => onOpenReport('recipe', r.id, r.title)}
+                    onEditRecipe={onEditRecipe}
                   />
                 </div>
               ))}

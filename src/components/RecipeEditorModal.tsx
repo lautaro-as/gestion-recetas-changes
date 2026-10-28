@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Recipe, Ingredient, Step, DietaryTag, RecipeStatus } from '../types';
 import { useApp } from '../context/AppContext';
 import {
@@ -13,7 +13,10 @@ import {
   Image as ImageIcon,
   Save,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  FileEdit,
+  Lock
 } from 'lucide-react';
 
 interface RecipeEditorModalProps {
@@ -39,7 +42,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   const [category, setCategory] = useState<Recipe['category']>(recipeToEdit?.category || 'platos_fuertes');
   const [tags, setTags] = useState<DietaryTag[]>(recipeToEdit?.tags || ['vegetariano']);
   const [videoUrl, setVideoUrl] = useState(recipeToEdit?.videoUrl || '');
-  const [coAuthorsText, setCoAuthorsText] = useState(recipeToEdit?.coAuthors.join(', ') || '');
+  const [coAuthorsText, setCoAuthorsText] = useState(recipeToEdit?.coAuthors?.join(', ') || '');
   const [showCollaboratorSuggestions, setShowCollaboratorSuggestions] = useState(false);
   
   // Publication Status & Scheduling
@@ -106,6 +109,120 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   const [fatG, setFatG] = useState(recipeToEdit?.nutrition.fatG || 14);
   const [fiberG, setFiberG] = useState(recipeToEdit?.nutrition.fiberG || 5);
 
+  useEffect(() => {
+    if (isOpen) {
+      if (recipeToEdit) {
+        setTitle(recipeToEdit.title);
+        setDescription(recipeToEdit.description);
+        setCoverImage(recipeToEdit.coverImage);
+        setPrepTimeMin(recipeToEdit.prepTimeMin);
+        setCookTimeMin(recipeToEdit.cookTimeMin);
+        setServings(recipeToEdit.servings);
+        setDifficulty(recipeToEdit.difficulty);
+        setCategory(recipeToEdit.category);
+        setTags(recipeToEdit.tags || []);
+        setVideoUrl(recipeToEdit.videoUrl || '');
+        setCoAuthorsText(recipeToEdit.coAuthors?.join(', ') || '');
+        setStatus(recipeToEdit.status);
+        setScheduledDate(
+          recipeToEdit.scheduledPublishDate
+            ? new Date(recipeToEdit.scheduledPublishDate).toISOString().slice(0, 16)
+            : new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16)
+        );
+        setIngredients(
+          recipeToEdit.ingredients && recipeToEdit.ingredients.length > 0
+            ? recipeToEdit.ingredients.map(i => ({ ...i }))
+            : [
+                {
+                  id: `ing-${Date.now()}-1`,
+                  name: '',
+                  quantity: 1,
+                  unit: 'unidad',
+                  estimatedPrice: 1.0,
+                  storeName: 'Mercado Fresco Orgánico',
+                  storeLocation: 'Centro',
+                  inStock: true,
+                  stockLevel: 'alto',
+                  category: 'frescos'
+                }
+              ]
+        );
+        setSteps(
+          recipeToEdit.steps && recipeToEdit.steps.length > 0
+            ? recipeToEdit.steps.map(s => ({ ...s }))
+            : [
+                {
+                  stepNumber: 1,
+                  title: 'Preparación y mise en place',
+                  description: '',
+                  durationMinutes: 10
+                }
+              ]
+        );
+        setCalories(recipeToEdit.nutrition?.calories ?? 300);
+        setProteinG(recipeToEdit.nutrition?.proteinG ?? 10);
+        setCarbsG(recipeToEdit.nutrition?.carbsG ?? 30);
+        setFatG(recipeToEdit.nutrition?.fatG ?? 10);
+        setFiberG(recipeToEdit.nutrition?.fiberG ?? 4);
+      } else {
+        setTitle('');
+        setDescription('');
+        setCoverImage('');
+        setPrepTimeMin(20);
+        setCookTimeMin(30);
+        setServings(4);
+        setDifficulty('facil');
+        setCategory('platos_fuertes');
+        setTags(['vegetariano']);
+        setVideoUrl('');
+        setCoAuthorsText('');
+        setStatus('published');
+        setScheduledDate(new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16));
+        setIngredients([
+          {
+            id: `ing-${Date.now()}-1`,
+            name: 'Aceite de oliva virgen extra',
+            quantity: 30,
+            unit: 'ml',
+            estimatedPrice: 1.5,
+            storeName: 'Supermercado Central Gourmet',
+            storeLocation: 'Av. Libertador 880',
+            inStock: true,
+            stockLevel: 'alto',
+            category: 'frescos'
+          }
+        ]);
+        setSteps([
+          {
+            stepNumber: 1,
+            title: 'Preparación y mise en place',
+            description: '',
+            durationMinutes: 10
+          }
+        ]);
+        setCalories(320);
+        setProteinG(12);
+        setCarbsG(35);
+        setFatG(14);
+        setFiberG(5);
+      }
+    }
+  }, [isOpen, recipeToEdit]);
+
+  // Permissions validation: author, co-authors, and staff (admin/editor)
+  const isAuthor = !recipeToEdit || recipeToEdit.authorId === currentUser.id;
+  const isCoAuthor = Boolean(
+    recipeToEdit?.coAuthors &&
+      recipeToEdit.coAuthors.some(
+        (ca) =>
+          ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+          ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
+          (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
+      )
+  );
+  const isStaff = currentUser.role === 'editor' || currentUser.role === 'admin';
+  const canEdit = isAuthor || isCoAuthor || isStaff;
+
   if (!isOpen) return null;
 
   const toggleTag = (tag: DietaryTag) => {
@@ -171,6 +288,12 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       showToast('Debes iniciar sesión para guardar o publicar una receta.');
       return;
     }
+
+    if (recipeToEdit && !canEdit) {
+      showToast('No tienes permisos suficientes para modificar esta receta.');
+      return;
+    }
+
     if (!title.trim()) {
       showToast('Por favor introduce un título para la receta.');
       return;
@@ -186,9 +309,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       .filter((s) => s.length > 0);
 
     const recipeData = {
-      title,
-      description,
-      coverImage,
+      title: title.trim(),
+      description: description.trim(),
+      coverImage: coverImage.trim(),
       authorId: recipeToEdit ? recipeToEdit.authorId : currentUser.id,
       authorName: recipeToEdit ? recipeToEdit.authorName : currentUser.name,
       authorAvatar: recipeToEdit ? recipeToEdit.authorAvatar : currentUser.avatar,
@@ -214,12 +337,14 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
     };
 
     if (recipeToEdit) {
-      updateRecipe(recipeToEdit.id, recipeData);
+      const ok = updateRecipe(recipeToEdit.id, recipeData);
+      if (ok) {
+        onClose();
+      }
     } else {
       createRecipe(recipeData);
+      onClose();
     }
-
-    onClose();
   };
 
   return (
@@ -234,13 +359,15 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 {recipeToEdit ? 'Editar Receta' : 'Nueva Creación Culinaria'}
               </h2>
               <p className="text-xs text-amber-100">
-                Estructura ingredientes, paso a paso, etiquetas dietéticas y programación
+                {recipeToEdit
+                  ? `Modificando "${recipeToEdit.title}" (${recipeToEdit.status === 'draft' ? 'Borrador' : recipeToEdit.status === 'scheduled' ? 'Programada' : 'Publicada'})`
+                  : 'Estructura ingredientes, paso a paso, etiquetas dietéticas y programación'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-amber-200 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors"
+            className="text-amber-200 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -248,6 +375,53 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
 
         {/* Scrollable Form */}
         <form onSubmit={handleSubmit} className="overflow-y-auto p-6 sm:p-8 space-y-6">
+          {/* Status & Permissions Notice Banner */}
+          {recipeToEdit && (
+            <div className="space-y-3">
+              {recipeToEdit.status === 'draft' ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
+                  <FileEdit className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                  <div className="text-xs text-emerald-900 leading-relaxed">
+                    <strong className="block text-emerald-950 font-bold mb-0.5">
+                      Borrador privado en edición
+                    </strong>
+                    Tienes total libertad para modificar todos los datos, ingredientes, tiempos y pasos. Puedes mantenerlo como borrador o publicarlo directamente en el catálogo cuando esté listo.
+                  </div>
+                </div>
+              ) : recipeToEdit.status === 'published' ? (
+                <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl flex items-start gap-3">
+                  <ShieldCheck className="w-5 h-5 text-sky-700 shrink-0 mt-0.5" />
+                  <div className="text-xs text-sky-900 leading-relaxed">
+                    <strong className="block text-sky-950 font-bold mb-0.5">
+                      Receta publicada en catálogo (Modificación sujeta a restricciones de integridad)
+                    </strong>
+                    Esta receta ya se encuentra visible en el catálogo gastronómico. Puedes actualizar y enriquecer la descripción, ingredientes, instrucciones y tiempos de cocción. Por integridad de la comunidad, el autor original, la fecha de publicación, los comentarios y las valoraciones se conservan intactos.
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+                  <Calendar className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-900 leading-relaxed">
+                    <strong className="block text-amber-950 font-bold mb-0.5">
+                      Receta programada en edición
+                    </strong>
+                    Puedes modificar los contenidos, pasos o ajustar la fecha y hora programada para su lanzamiento automático.
+                  </div>
+                </div>
+              )}
+
+              {!canEdit && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-800 text-xs">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold mb-0.5">Acceso restringido para edición</strong>
+                    No tienes autorización para modificar esta receta. Solo el autor principal, sus coautores registrados o el equipo editorial pueden realizar cambios.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-4">
@@ -777,93 +951,114 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
               Estado de Publicación & Programación
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <label
-                className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                  status === 'published'
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                    : 'bg-white text-stone-700 border-amber-200'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="status"
-                  value="published"
-                  checked={status === 'published'}
-                  onChange={() => setStatus('published')}
-                  className="sr-only"
-                />
-                <CheckCircle className="w-4 h-4 shrink-0" />
-                <div className="text-xs">
-                  <div className="font-bold">Publicar Ahora</div>
-                  <div className={`text-[10px] ${status === 'published' ? 'text-amber-100' : 'text-stone-500'}`}>
-                    Visible de inmediato
-                  </div>
+            {recipeToEdit?.status === 'published' && !isStaff ? (
+              <div className="p-3.5 bg-white rounded-xl border border-amber-300 flex items-start gap-3">
+                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg shrink-0">
+                  <CheckCircle className="w-5 h-5" />
                 </div>
-              </label>
-
-              <label
-                className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                  status === 'draft'
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                    : 'bg-white text-stone-700 border-amber-200'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="status"
-                  value="draft"
-                  checked={status === 'draft'}
-                  onChange={() => setStatus('draft')}
-                  className="sr-only"
-                />
-                <Save className="w-4 h-4 shrink-0" />
-                <div className="text-xs">
-                  <div className="font-bold">Guardar Borrador</div>
-                  <div className={`text-[10px] ${status === 'draft' ? 'text-amber-100' : 'text-stone-500'}`}>
-                    Solo visible para ti
+                <div className="text-xs space-y-1">
+                  <div className="font-bold text-stone-900 flex items-center gap-2">
+                    <span>Receta Publicada Activa en el Catálogo</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                      Publicada
+                    </span>
                   </div>
+                  <p className="text-stone-600 leading-relaxed text-[11px]">
+                    Esta receta se encuentra pública y disponible para la comunidad. Al guardar las modificaciones, sus datos culinarios e ingredientes se actualizarán de forma inmediata en el catálogo, manteniendo protegida la autoría y las valoraciones de los usuarios.
+                  </p>
                 </div>
-              </label>
-
-              <label
-                className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                  status === 'scheduled'
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                    : 'bg-white text-stone-700 border-amber-200'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="status"
-                  value="scheduled"
-                  checked={status === 'scheduled'}
-                  onChange={() => setStatus('scheduled')}
-                  className="sr-only"
-                />
-                <Calendar className="w-4 h-4 shrink-0" />
-                <div className="text-xs">
-                  <div className="font-bold">Programar Lanzamiento</div>
-                  <div className={`text-[10px] ${status === 'scheduled' ? 'text-amber-100' : 'text-stone-500'}`}>
-                    Fecha y hora exacta
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            {status === 'scheduled' && (
-              <div className="p-3 bg-white rounded-xl border border-amber-300 flex flex-col sm:flex-row items-center gap-3">
-                <span className="text-xs font-bold text-stone-700 shrink-0">
-                  Fecha y Hora de Publicación Automática:
-                </span>
-                <input
-                  type="datetime-local"
-                  required
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-semibold text-stone-800"
-                />
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label
+                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      status === 'published'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white text-stone-700 border-amber-200'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      value="published"
+                      checked={status === 'published'}
+                      onChange={() => setStatus('published')}
+                      className="sr-only"
+                    />
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    <div className="text-xs">
+                      <div className="font-bold">Publicar Ahora</div>
+                      <div className={`text-[10px] ${status === 'published' ? 'text-amber-100' : 'text-stone-500'}`}>
+                        Visible de inmediato
+                      </div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      status === 'draft'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white text-stone-700 border-amber-200'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      value="draft"
+                      checked={status === 'draft'}
+                      onChange={() => setStatus('draft')}
+                      className="sr-only"
+                    />
+                    <Save className="w-4 h-4 shrink-0" />
+                    <div className="text-xs">
+                      <div className="font-bold">Guardar Borrador</div>
+                      <div className={`text-[10px] ${status === 'draft' ? 'text-amber-100' : 'text-stone-500'}`}>
+                        {recipeToEdit?.status === 'draft' ? 'Continuar en borrador' : 'Solo visible para ti'}
+                      </div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      status === 'scheduled'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white text-stone-700 border-amber-200'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      value="scheduled"
+                      checked={status === 'scheduled'}
+                      onChange={() => setStatus('scheduled')}
+                      className="sr-only"
+                    />
+                    <Calendar className="w-4 h-4 shrink-0" />
+                    <div className="text-xs">
+                      <div className="font-bold">Programar Lanzamiento</div>
+                      <div className={`text-[10px] ${status === 'scheduled' ? 'text-amber-100' : 'text-stone-500'}`}>
+                        Fecha y hora exacta
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {status === 'scheduled' && (
+                  <div className="p-3 bg-white rounded-xl border border-amber-300 flex flex-col sm:flex-row items-center gap-3">
+                    <span className="text-xs font-bold text-stone-700 shrink-0">
+                      Fecha y Hora de Publicación Automática:
+                    </span>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={scheduledDate}
+                      onChange={(e) => setScheduledDate(e.target.value)}
+                      className="px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-semibold text-stone-800"
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -872,16 +1067,26 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-stone-600 hover:text-stone-800 text-xs font-semibold rounded-xl hover:bg-stone-100"
+              className="px-4 py-2 text-stone-600 hover:text-stone-800 text-xs font-semibold rounded-xl hover:bg-stone-100 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-[#E09F3E] hover:bg-[#835500] text-white text-xs sm:text-sm font-bold rounded-full shadow-md transition-colors flex items-center gap-2 cursor-pointer"
+              disabled={recipeToEdit ? !canEdit : false}
+              title={recipeToEdit && !canEdit ? 'Solo el autor o moderadores pueden guardar cambios' : undefined}
+              className={`px-6 py-2.5 text-white text-xs sm:text-sm font-bold rounded-full shadow-md transition-colors flex items-center gap-2 ${
+                recipeToEdit && !canEdit
+                  ? 'bg-stone-400 cursor-not-allowed opacity-60'
+                  : 'bg-[#E09F3E] hover:bg-[#835500] cursor-pointer'
+              }`}
             >
               <Save className="w-4 h-4" />
-              {recipeToEdit ? 'Guardar Cambios' : 'Confirmar y Guardar Receta'}
+              {recipeToEdit
+                ? recipeToEdit.status === 'draft'
+                  ? 'Guardar Modificaciones'
+                  : 'Guardar Cambios'
+                : 'Confirmar y Guardar Receta'}
             </button>
           </div>
         </form>

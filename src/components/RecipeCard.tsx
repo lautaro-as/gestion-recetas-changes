@@ -7,12 +7,14 @@ interface RecipeCardProps {
   recipe: Recipe;
   onOpenDetail: (recipe: Recipe) => void;
   onOpenReport?: (recipe: Recipe) => void;
+  onEditRecipe?: (recipe: Recipe) => void;
 }
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({
   recipe,
   onOpenDetail,
   onOpenReport,
+  onEditRecipe,
 }) => {
   const {
     currentUser,
@@ -39,8 +41,19 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   const isInWishlist = currentUser.wishlistRecipeIds.includes(recipe.id);
   const isComparing = comparingRecipeIds.includes(recipe.id);
   const isAuthor = recipe.authorId === currentUser.id;
-  const canPin = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
-  const canDelete = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
+  const isCoAuthor = Boolean(
+    recipe.coAuthors &&
+      recipe.coAuthors.some(
+        (ca) =>
+          ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+          ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
+          (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
+      )
+  );
+  const isStaff = currentUser.role === 'editor' || currentUser.role === 'admin';
+  const canEdit = isAuthor || isCoAuthor || isStaff;
+  const canPin = isAuthor || isStaff;
+  const canDelete = isAuthor || isStaff;
 
   const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
 
@@ -322,6 +335,20 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     >
                       <span className="material-symbols-outlined text-[16px]">schedule_send</span>
                       <span>Publicar ahora</span>
+                    </button>
+                  )}
+
+                  {canEdit && onEditRecipe && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onEditRecipe(recipe);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-amber-50 flex items-center gap-2 text-amber-800 font-medium border-t border-stone-100 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">edit</span>
+                      <span>Editar receta</span>
                     </button>
                   )}
 
