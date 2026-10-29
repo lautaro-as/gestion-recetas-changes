@@ -40,6 +40,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     followUserToggle,
     selectSpecificUser,
     publishScheduledNow,
+    togglePinRecipe,
     showToast,
   } = useApp();
 
@@ -66,8 +67,16 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [colName, setColName] = useState('');
   const [colDesc, setColDesc] = useState('');
 
-  // Filter recipes for user
-  const myCreated = recipes.filter((r) => r.authorId === currentUser.id && r.status === 'published');
+  // Filter recipes for user - Pinned recipe always appears at the top
+  const myCreated = recipes
+    .filter((r) => r.authorId === currentUser.id && r.status === 'published')
+    .sort((a, b) => {
+      const aPinned = a.id === currentUser.pinnedRecipeId || a.isPinned;
+      const bPinned = b.id === currentUser.pinnedRecipeId || b.isPinned;
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   const myDrafts = recipes.filter((r) => r.authorId === currentUser.id && r.status === 'draft');
   const myScheduled = recipes.filter((r) => r.authorId === currentUser.id && r.status === 'scheduled');
   const myWishlist = recipes.filter((r) => currentUser.wishlistRecipeIds.includes(r.id));
@@ -608,18 +617,28 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 </span>
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[#835500]">
-                    Receta Fijada en tu Perfil
+                    Receta Fijada al Inicio de tu Perfil
                   </span>
                   <h4 className="text-sm font-bold text-[#1B1C1C]">{pinnedRecipe.title}</h4>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => onOpenDetail(pinnedRecipe)}
-                className="px-4 py-1.5 rounded-full bg-white text-[#835500] text-xs font-bold shadow-xs hover:bg-[#F6F3F2]"
-              >
-                Ver destacada
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => togglePinRecipe(pinnedRecipe.id)}
+                  className="px-3 py-1.5 rounded-full bg-amber-100 hover:bg-amber-200 text-[#835500] text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[14px]">push_pin</span>
+                  <span>Desfijar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenDetail(pinnedRecipe)}
+                  className="px-4 py-1.5 rounded-full bg-white text-[#835500] text-xs font-bold shadow-xs hover:bg-[#F6F3F2] cursor-pointer"
+                >
+                  Ver receta
+                </button>
+              </div>
             </div>
           )}
 

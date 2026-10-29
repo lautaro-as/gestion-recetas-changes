@@ -618,14 +618,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const nextState = !target.isPinned;
-    setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, isPinned: nextState } : r));
+    setRecipes(prev => prev.map(r => {
+      if (r.id === recipeId) {
+        return { ...r, isPinned: nextState };
+      }
+      // If pinning a new recipe, unpin any other recipe by this author
+      if (nextState && r.authorId === target.authorId && r.isPinned) {
+        return { ...r, isPinned: false };
+      }
+      return r;
+    }));
+
     setUsers(prev => prev.map(u => {
       if (u.id === currentUser.id) {
         return { ...u, pinnedRecipeId: nextState ? recipeId : undefined };
       }
       return u;
     }));
-    showToast(nextState ? 'Receta fijada en la parte superior.' : 'Receta desfijada.');
+
+    showToast(nextState ? 'Receta fijada en la parte superior de tu perfil.' : 'Receta desfijada del perfil.');
   };
 
   const toggleLikeRecipe = (recipeId: string) => {

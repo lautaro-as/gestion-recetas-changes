@@ -107,28 +107,54 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           )}
         </div>
 
-        {/* Wishlist Bookmark Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleWishlist(recipe.id);
-          }}
-          aria-label="Guardar en favoritos"
-          title="Guardar en lista de deseos"
-          className={`absolute bottom-3 right-3 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center shadow-sm transition-all cursor-pointer ${
-            isInWishlist
-              ? 'bg-[#AB3333] text-white'
-              : 'bg-white/80 text-[#333333] hover:text-[#AB3333] hover:bg-white'
-          }`}
-        >
-          <span
-            className="material-symbols-outlined text-[18px]"
-            style={isInWishlist ? { fontVariationSettings: "'FILL' 1" } : {}}
+        {/* Action icons container: Direct Pin (if author/staff) and Wishlist */}
+        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-10">
+          {canPin && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                togglePinRecipe(recipe.id);
+              }}
+              aria-label={recipe.isPinned ? "Desfijar del perfil" : "Fijar en la parte superior del perfil"}
+              title={recipe.isPinned ? "Receta fijada al inicio de tu perfil (clic para desfijar)" : "Fijar en la parte superior de tu perfil personal"}
+              className={`w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center shadow-sm transition-all cursor-pointer ${
+                recipe.isPinned
+                  ? 'bg-[#E09F3E] text-white ring-2 ring-white scale-105 shadow-md'
+                  : 'bg-white/85 text-[#5A3900] hover:bg-[#E09F3E] hover:text-white'
+              }`}
+            >
+              <span
+                className="material-symbols-outlined text-[17px]"
+                style={recipe.isPinned ? { fontVariationSettings: "'FILL' 1" } : {}}
+              >
+                push_pin
+              </span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleWishlist(recipe.id);
+            }}
+            aria-label="Guardar en favoritos"
+            title="Guardar en lista de deseos"
+            className={`w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center shadow-sm transition-all cursor-pointer ${
+              isInWishlist
+                ? 'bg-[#AB3333] text-white'
+                : 'bg-white/80 text-[#333333] hover:text-[#AB3333] hover:bg-white'
+            }`}
           >
-            bookmark
-          </span>
-        </button>
+            <span
+              className="material-symbols-outlined text-[18px]"
+              style={isInWishlist ? { fontVariationSettings: "'FILL' 1" } : {}}
+            >
+              bookmark
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Card Content */}
@@ -272,18 +298,25 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 <span>Ver receta</span>
               </button>
 
-              {/* Compare Button */}
+              {/* Compare Button (up to 3 recipes) */}
               <button
                 type="button"
                 onClick={() => toggleCompareRecipe(recipe.id)}
-                title="Comparar recetas lado a lado"
-                className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                title={
+                  isComparing
+                    ? "Quitar del comparador"
+                    : comparingRecipeIds.length >= 3
+                    ? "Límite alcanzado: máximo 3 recetas lado a lado"
+                    : "Comparar hasta 3 recetas lado a lado"
+                }
+                className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
                   isComparing
                     ? 'bg-[#E09F3E] text-white shadow-sm font-semibold'
                     : 'bg-[#F0EDED] text-[#333333] hover:bg-[#FFDDB9]'
                 }`}
               >
-                {isComparing ? '✓ Comparando' : 'Comparar'}
+                <span className="material-symbols-outlined text-[14px]">balance</span>
+                <span>{isComparing ? 'En comparador' : 'Comparar'}</span>
               </button>
             </div>
 
