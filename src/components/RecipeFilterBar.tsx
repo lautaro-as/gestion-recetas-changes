@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { DietaryTag } from '../types';
 import { ScrollableFilterBar } from './ScrollableFilterBar';
+import { SearchScope, POPULAR_INGREDIENTS } from '../utils/searchUtils';
 
 interface RecipeFilterBarProps {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+  searchScope: SearchScope;
+  setSearchScope: (scope: SearchScope) => void;
+  selectedSpecificIngredients: string[];
+  setSelectedSpecificIngredients: React.Dispatch<React.SetStateAction<string[]>>;
   selectedCategory: string;
   setSelectedCategory: (cat: string) => void;
   selectedTags: DietaryTag[];
@@ -20,13 +25,13 @@ interface RecipeFilterBarProps {
 }
 
 const CATEGORIES = [
-  { id: 'todas', label: 'Todas' },
+  { id: 'todas', label: 'Todas las categorías' },
   { id: 'panaderia', label: 'Panadería & Masas' },
-  { id: 'pastas', label: 'Platos fuertes & Pastas' },
-  { id: 'ensaladas', label: 'Entrantes & Bowls' },
-  { id: 'postres', label: 'Postres' },
+  { id: 'pastas', label: 'Pastas & Platos Fuertes' },
+  { id: 'ensaladas', label: 'Entrantes & Ensaladas' },
+  { id: 'postres', label: 'Postres & Dulces' },
   { id: 'desayunos', label: 'Bebidas & Desayunos' },
-  { id: 'sopas', label: 'Sopas & Cremas' }
+  { id: 'sopas', label: 'Sopas & Cremas' },
 ];
 
 const DIETARY_OPTIONS: { id: DietaryTag | 'todas'; label: string }[] = [
@@ -39,9 +44,21 @@ const DIETARY_OPTIONS: { id: DietaryTag | 'todas'; label: string }[] = [
   { id: 'sin_lactosa', label: 'Sin lactosa' },
 ];
 
+const SCOPE_OPTIONS: { id: SearchScope; label: string; icon: string; description: string }[] = [
+  { id: 'todo', label: 'Todo', icon: 'travel_explore', description: 'Búsqueda unificada en título, ingredientes, categorías y palabras clave' },
+  { id: 'titulo', label: 'Título', icon: 'title', description: 'Buscar exclusivamente por el título de la receta' },
+  { id: 'ingredientes', label: 'Ingredientes', icon: 'grocery', description: 'Buscar por ingredientes específicos (ej. queso, albahaca, aguacate)' },
+  { id: 'palabras_clave', label: 'Palabras clave', icon: 'auto_awesome', description: 'Buscar por técnicas culinarias, pasos, tips y términos descriptivos' },
+  { id: 'categoria', label: 'Categoría', icon: 'restaurant_menu', description: 'Buscar por categoría general (pastas, postres, panadería, etc.)' },
+];
+
 export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
   searchQuery,
   setSearchQuery,
+  searchScope,
+  setSearchScope,
+  selectedSpecificIngredients,
+  setSelectedSpecificIngredients,
   selectedCategory,
   setSelectedCategory,
   selectedTags,
@@ -56,6 +73,7 @@ export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
   onClearFilters,
 }) => {
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
+  const [customIngredientInput, setCustomIngredientInput] = useState('');
 
   const handleDietSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -70,9 +88,86 @@ export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
     setMaxTime(Number(e.target.value));
   };
 
+  const toggleSpecificIngredient = (ingredientName: string) => {
+    setSelectedSpecificIngredients((prev) => {
+      const exists = prev.some((i) => i.toLowerCase() === ingredientName.toLowerCase());
+      if (exists) {
+        return prev.filter((i) => i.toLowerCase() !== ingredientName.toLowerCase());
+      } else {
+        return [...prev, ingredientName];
+      }
+    });
+  };
+
+  const handleAddCustomIngredient = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = customIngredientInput.trim();
+    if (clean) {
+      toggleSpecificIngredient(clean);
+      setCustomIngredientInput('');
+    }
+  };
+
+  const removeIngredient = (ingredientName: string) => {
+    setSelectedSpecificIngredients((prev) =>
+      prev.filter((i) => i.toLowerCase() !== ingredientName.toLowerCase())
+    );
+  };
+
+  // Helper placeholder based on current scope
+  const getSearchPlaceholder = () => {
+    switch (searchScope) {
+      case 'titulo':
+        return 'Buscar por título exacto o parcial (ej. Hogaza, Pasta al Pesto, Tiramisú)...';
+      case 'ingredientes':
+        return 'Buscar por ingredientes específicos (ej. albahaca, queso mascarpone, café, aguacate)...';
+      case 'palabras_clave':
+        return 'Buscar palabras clave, técnicas o pasos (ej. amasado, fermentación en frío, mortero, horno)...';
+      case 'categoria':
+        return 'Buscar por categoría general (ej. postres, pastas, panadería, sopas, ensaladas)...';
+      default:
+        return 'Buscar por palabras clave, ingredientes específicos, título, categoría o alias (@autor)...';
+    }
+  };
+
   return (
-    <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_4px_24px_-4px_rgba(197,130,38,0.08)] mb-8 border border-stone-200/60">
-      {/* Search Bar with filter toggle arrow on the right */}
+    <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_4px_24px_-4px_rgba(197,130,38,0.08)] mb-8 border border-stone-200/60 space-y-4">
+      {/* RF-16 Scope Switcher Pill Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1 border-b border-stone-100">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-[#FFDDB9] text-[#835500] flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-[16px]">search</span>
+          </span>
+          <span className="text-xs font-bold text-stone-700">
+            Criterio de Búsqueda:
+          </span>
+        </div>
+
+        {/* Scope selector tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+          {SCOPE_OPTIONS.map((opt) => {
+            const isSelected = searchScope === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setSearchScope(opt.id)}
+                title={opt.description}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#E09F3E] text-white shadow-xs font-bold ring-2 ring-[#E09F3E]/30'
+                    : 'bg-[#f6f3f2] text-stone-600 hover:bg-[#ffddb9]/60 hover:text-[#5A3900]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[15px]">{opt.icon}</span>
+                <span>{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Search Input */}
       <div className="relative w-full flex items-center gap-2">
         <div className="relative flex-1 flex items-center">
           <div className="absolute inset-y-0 left-0 pl-4 sm:pl-5 flex items-center pointer-events-none text-[#835500]">
@@ -83,7 +178,7 @@ export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar recetas por nombre o ingrediente, o buscar usuarios por alias (@usuario) o nombre..."
+            placeholder={getSearchPlaceholder()}
             className="w-full h-12 sm:h-13 pl-12 sm:pl-14 pr-10 rounded-full bg-[#f6f3f2] text-[#000000] placeholder:text-[#333333]/70 text-xs sm:text-sm focus:bg-white focus:ring-2 focus:ring-[#e09f3e] outline-none transition-all shadow-inner"
           />
           {searchQuery && (
@@ -127,14 +222,102 @@ export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
         </button>
       </div>
 
-      {/* Collapsible Filters Container */}
+      {/* Quick Ingredients Chips Row (Búsqueda por ingredientes específicos) */}
+      <div className="pt-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <span className="text-[11px] font-bold text-[#5A3900] uppercase tracking-wider shrink-0 flex items-center gap-1">
+            <span className="material-symbols-outlined text-[15px] text-[#835500]">kitchen</span>
+            Ingredientes específicos:
+          </span>
+
+          <div className="flex-1 flex flex-wrap items-center gap-1.5">
+            {POPULAR_INGREDIENTS.map((item) => {
+              const isSelected = selectedSpecificIngredients.some(
+                (i) => i.toLowerCase() === item.name.toLowerCase()
+              );
+              return (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => toggleSpecificIngredient(item.name)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs transition-all cursor-pointer border ${
+                    isSelected
+                      ? 'bg-[#835500] text-white border-[#835500] font-bold shadow-2xs scale-102'
+                      : 'bg-[#f6f3f2] text-stone-700 border-stone-200/60 hover:bg-[#ffddb9]/50'
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.name}</span>
+                  {isSelected && (
+                    <span className="material-symbols-outlined text-[14px]">check</span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Custom ingredient input form */}
+            <form onSubmit={handleAddCustomIngredient} className="inline-flex items-center gap-1">
+              <input
+                type="text"
+                value={customIngredientInput}
+                onChange={(e) => setCustomIngredientInput(e.target.value)}
+                placeholder="+ Otro ingrediente..."
+                className="h-7 px-2.5 text-xs rounded-full bg-[#f6f3f2] border border-stone-200 text-stone-800 focus:bg-white focus:ring-1 focus:ring-[#e09f3e] outline-none w-32 placeholder:text-stone-400"
+              />
+              {customIngredientInput.trim() && (
+                <button
+                  type="submit"
+                  className="h-7 px-2 rounded-full bg-[#e09f3e] text-white text-xs font-bold hover:bg-[#c98629] transition-colors cursor-pointer"
+                >
+                  +
+                </button>
+              )}
+            </form>
+          </div>
+        </div>
+
+        {/* Selected specific ingredients tags */}
+        {selectedSpecificIngredients.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 p-2 rounded-2xl bg-amber-50/70 border border-amber-200/60 text-xs">
+            <span className="font-bold text-[#835500] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[15px]">filter_alt</span>
+              Filtrando por ingredientes que debe contener:
+            </span>
+            {selectedSpecificIngredients.map((ing) => (
+              <span
+                key={ing}
+                className="inline-flex items-center gap-1 bg-[#835500] text-white px-2.5 py-0.5 rounded-full font-semibold shadow-2xs"
+              >
+                <span>{ing}</span>
+                <button
+                  type="button"
+                  onClick={() => removeIngredient(ing)}
+                  className="hover:text-amber-200 cursor-pointer ml-0.5"
+                  aria-label={`Eliminar filtro de ${ing}`}
+                >
+                  <span className="material-symbols-outlined text-[13px]">close</span>
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSelectedSpecificIngredients([])}
+              className="text-[#ab3333] hover:underline font-semibold text-[11px] ml-auto cursor-pointer"
+            >
+              Quitar ingredientes
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Collapsible Filters Container (Categories, Diet, Difficulty, Time, Sort) */}
       {isFiltersExpanded && (
-        <div className="mt-5 pt-4 border-t border-stone-100 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-          {/* Categories with Horizontal Scroll and Side Overflow Arrows */}
+        <div className="pt-4 border-t border-stone-100 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* Categories with Horizontal Scroll */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="text-xs font-bold text-[#5A3900] uppercase tracking-wider shrink-0 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[18px] text-[#835500]">dinner_dining</span>
-              Categorías:
+              Categorías Generales:
             </span>
             <div className="flex-1 min-w-0">
               <ScrollableFilterBar gradientBg="from-white via-white/95">
@@ -245,7 +428,7 @@ export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
                 className="inline-flex items-center gap-1.5 text-[#ab3333] hover:text-[#801318] text-xs font-semibold px-3 py-1.5 rounded-full hover:bg-red-50 transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                <span>Restablecer filtros ({activeFilterCount})</span>
+                <span>Restablecer todos los filtros ({activeFilterCount})</span>
               </button>
             </div>
           )}

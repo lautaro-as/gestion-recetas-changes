@@ -23,6 +23,12 @@ import { ReportModal } from './components/ReportModal';
 import { PublicProfileModal } from './components/PublicProfileModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import {
+  SearchScope,
+  evaluateRF16Match,
+  CATEGORY_DEFINITIONS,
+  normalizeText,
+} from './utils/searchUtils';
+import {
   Sparkles,
   ChefHat,
   Search,
@@ -51,8 +57,10 @@ function AppContent() {
   // Navigation view: 'explorar' | 'destacadas' | 'foro' | 'comparar' | 'perfil' | 'moderacion'
   const [activeView, setActiveView] = useState<string>('explorar');
 
-  // Search & Filter State
+  // RF-16: Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('todo');
+  const [selectedSpecificIngredients, setSelectedSpecificIngredients] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('todas');
   const [selectedTags, setSelectedTags] = useState<DietaryTag[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState('todas');
@@ -76,16 +84,16 @@ function AppContent() {
     title: string;
   }>({ type: 'recipe', id: '', title: '' });
 
-  // RF-21: Búsqueda de Perfiles por nombre de usuario o alias (@usuario)
+  // RF-21: Búsqueda de Perfiles por nombre de usuario o alias (@usuario) con normalización insensible a tildes
   const matchedUsers = useMemo(() => {
-    const rawQ = searchQuery.trim().toLowerCase();
+    const rawQ = searchQuery.trim();
     if (!rawQ) return [];
-    const cleanQ = rawQ.replace(/^@/, '');
+    const cleanQ = normalizeText(rawQ.replace(/^@/, ''));
     return allUsers.filter((u) => {
-      const matchUsername = u.username.toLowerCase().includes(cleanQ);
-      const matchAlias = `@${u.username.toLowerCase()}`.includes(rawQ);
-      const matchName = u.name.toLowerCase().includes(cleanQ);
-      const matchSpecialty = u.specialties.some((s) => s.toLowerCase().includes(cleanQ));
+      const matchUsername = normalizeText(u.username).includes(cleanQ);
+      const matchAlias = `@${normalizeText(u.username)}`.includes(normalizeText(rawQ));
+      const matchName = normalizeText(u.name).includes(cleanQ);
+      const matchSpecialty = u.specialties.some((s) => normalizeText(s).includes(cleanQ));
       return matchUsername || matchAlias || matchName || matchSpecialty;
     });
   }, [allUsers, searchQuery]);
@@ -97,8 +105,10 @@ function AppContent() {
     if (selectedDifficulty !== 'todas') count += 1;
     if (maxTime < 180) count += 1;
     if (searchQuery.trim().length > 0) count += 1;
+    if (searchScope !== 'todo') count += 1;
+    count += selectedSpecificIngredients.length;
     return count;
-  }, [selectedTags, selectedCategory, selectedDifficulty, maxTime, searchQuery]);
+  }, [selectedTags, selectedCategory, selectedDifficulty, maxTime, searchQuery, searchScope, selectedSpecificIngredients]);
 
   const handleClearFilters = () => {
     setSelectedTags([]);
@@ -106,70 +116,89 @@ function AppContent() {
     setSelectedDifficulty('todas');
     setMaxTime(180);
     setSearchQuery('');
+    setSearchScope('todo');
+    setSelectedSpecificIngredients([]);
   };
 
-  // Filter recipes logic
-  const filteredRecipes = useMemo(() => {
-    return recipes.filter((recipe) => {
-      // If exploring, hide drafts unless current user is author
-      if (recipe.status === 'draft' && recipe.authorId !== currentUser.id) {
-        return false;
-      }
-
-      // Search query filter (keyword, ingredient, title, or author name/alias)
-      if (searchQuery.trim()) {
-        const rawQ = searchQuery.toLowerCase().trim();
-        const cleanQ = rawQ.replace(/^@/, '');
-        const matchesTitle = recipe.title.toLowerCase().includes(cleanQ);
-        const matchesDesc = recipe.description.toLowerCase().includes(cleanQ);
-        const matchesIngredient = recipe.ingredients.some((ing) =>
-          ing.name.toLowerCase().includes(cleanQ)
-        );
-        const matchesAuthorName = recipe.authorName.toLowerCase().includes(cleanQ);
-
-        // Find if this recipe's author has a matching alias or username
-        const authorUser = allUsers.find((u) => u.id === recipe.authorId);
-        const matchesAuthorAlias = authorUser && (
-          authorUser.username.toLowerCase().includes(cleanQ) ||
-          `@${authorUser.username.toLowerCase()}`.includes(rawQ)
-        );
-
-        if (!matchesTitle && !matchesDesc && !matchesIngredient && !matchesAuthorName && !matchesAuthorAlias) {
+  // RF-16: Filtrado exhaustivo por palabras clave, ingredientes específicos, título o categoría general
+  const filteredRecipesWithMeta = useMemo(() => {
+    return recipes
+      .filter((recipe) => {
+        // If exploring, hide drafts unless current user is author
+        if (recipe.status === 'draft' && recipe.authorId !== currentUser.id) {
           return false;
         }
-      }
 
-      // Category filter
-      if (selectedCategory !== 'todas' && recipe.category !== selectedCategory) {
-        return false;
-      }
+        // RF-16: Búsqueda por palabras clave, ingredientes específicos, título o categoría general
+        const matchResult = evaluateRF16Match(
+          recipe,
+          searchQuery,
+          searchScope,
+          selectedSpecificIngredients
+        );
+        if (!matchResult.matches) {
+          return false;
+        }
 
-      // Dietary tags filter (vegetarian, vegan, celiac, diabetic, keto...)
-      if (selectedTags.length > 0) {
-        const hasAllTags = selectedTags.every((tag) => recipe.tags.includes(tag));
-        if (!hasAllTags) return false;
-      }
+        // Category filter
+        if (selectedCategory !== 'todas') {
+          const def = CATEGORY_DEFINITIONS[selectedCategory];
+          const allowedCategories = def ? def.matchesCategories : [selectedCategory];
+          if (!allowedCategories.includes(recipe.category)) {
+            return false;
+          }
+        }
 
-      // Difficulty filter
-      if (selectedDifficulty !== 'todas' && recipe.difficulty !== selectedDifficulty) {
-        return false;
-      }
+        // Dietary tags filter (vegetarian, vegan, celiac, diabetic, keto...)
+        if (selectedTags.length > 0) {
+          const hasAllTags = selectedTags.every((tag) => recipe.tags.includes(tag));
+          if (!hasAllTags) return false;
+        }
 
-      // Time filter
-      const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
-      if (totalTime > maxTime) {
-        return false;
-      }
+        // Difficulty filter
+        if (selectedDifficulty !== 'todas' && recipe.difficulty !== selectedDifficulty) {
+          return false;
+        }
 
-      return true;
-    }).sort((a, b) => {
-      if (sortBy === 'popular') return b.likesCount - a.likesCount;
-      if (sortBy === 'recent') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (sortBy === 'time') return (a.prepTimeMin + a.cookTimeMin) - (b.prepTimeMin + b.cookTimeMin);
-      if (sortBy === 'calories') return a.nutrition.calories - b.nutrition.calories;
-      return 0;
-    });
-  }, [recipes, searchQuery, selectedCategory, selectedTags, selectedDifficulty, maxTime, sortBy, currentUser, allUsers]);
+        // Time filter
+        const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
+        if (totalTime > maxTime) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((recipe) => {
+        const matchResult = evaluateRF16Match(
+          recipe,
+          searchQuery,
+          searchScope,
+          selectedSpecificIngredients
+        );
+        return {
+          recipe,
+          matchReasons: matchResult.matchReasons,
+        };
+      })
+      .sort((a, b) => {
+        if (sortBy === 'popular') return b.recipe.likesCount - a.recipe.likesCount;
+        if (sortBy === 'recent') return new Date(b.recipe.createdAt).getTime() - new Date(a.recipe.createdAt).getTime();
+        if (sortBy === 'time') return (a.recipe.prepTimeMin + a.recipe.cookTimeMin) - (b.recipe.prepTimeMin + b.recipe.cookTimeMin);
+        if (sortBy === 'calories') return a.recipe.nutrition.calories - b.recipe.nutrition.calories;
+        return 0;
+      });
+  }, [
+    recipes,
+    searchQuery,
+    searchScope,
+    selectedSpecificIngredients,
+    selectedCategory,
+    selectedTags,
+    selectedDifficulty,
+    maxTime,
+    sortBy,
+    currentUser,
+  ]);
 
   const handleOpenReport = (type: 'recipe' | 'profile', id: string, title: string) => {
     setReportTarget({ type, id, title });
@@ -247,6 +276,10 @@ function AppContent() {
             <RecipeFilterBar
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
+              searchScope={searchScope}
+              setSearchScope={setSearchScope}
+              selectedSpecificIngredients={selectedSpecificIngredients}
+              setSelectedSpecificIngredients={setSelectedSpecificIngredients}
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
               selectedTags={selectedTags}
@@ -375,7 +408,7 @@ function AppContent() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-bold text-stone-600 uppercase tracking-wider">
-                  Catálogo Gastronómico ({filteredRecipes.length} recetas disponibles)
+                  Catálogo Gastronómico ({filteredRecipesWithMeta.length} recetas disponibles)
                 </h2>
                 {activeFilterCount > 0 && (
                   <button
@@ -387,17 +420,17 @@ function AppContent() {
                 )}
               </div>
 
-              {filteredRecipes.length === 0 ? (
+              {filteredRecipesWithMeta.length === 0 ? (
                 <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-3">
                   <span className="material-symbols-outlined text-[48px] text-stone-300">search_off</span>
                   <h3 className="font-bold text-stone-800 text-base">
-                    {searchQuery.trim()
-                      ? `No se encontraron recetas para "${searchQuery}"`
+                    {searchQuery.trim() || selectedSpecificIngredients.length > 0
+                      ? `No se encontraron recetas con el criterio actual`
                       : 'No se encontraron recetas con los filtros seleccionados'}
                   </h3>
                   <p className="text-xs text-stone-500 max-w-md mx-auto">
-                    {searchQuery.trim()
-                      ? 'Prueba buscando por ingredientes, técnicas o busca cocineros por su alias (@mateochef, @lucianutri, @camicocina).'
+                    {searchQuery.trim() || selectedSpecificIngredients.length > 0
+                      ? 'Prueba cambiando el alcance de búsqueda (Todo, Título, Ingredientes, Palabras clave, Categoría), quitando ingredientes específicos o buscando usuarios por alias (@mateochef, @lucianutri).'
                       : 'Prueba ajustando los filtros dietéticos, ampliando el tiempo de cocción o limpiando los filtros.'}
                   </p>
                   <button
@@ -409,13 +442,14 @@ function AppContent() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {filteredRecipes.map((recipe) => (
+                  {filteredRecipesWithMeta.map((item) => (
                     <RecipeCard
-                      key={recipe.id}
-                      recipe={recipe}
+                      key={item.recipe.id}
+                      recipe={item.recipe}
                       onOpenDetail={(r) => setSelectedRecipeDetail(r)}
                       onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}
                       onEditRecipe={handleEditRecipe}
+                      searchMatchReasons={item.matchReasons}
                     />
                   ))}
                 </div>
@@ -424,7 +458,7 @@ function AppContent() {
               {/* Bottom Pagination Info */}
               <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-6 py-6 border-t border-stone-200/60">
                 <div className="flex items-center gap-2 text-[#333333] text-xs sm:text-sm">
-                  <span>Mostrando <strong>1 - {filteredRecipes.length}</strong> de <strong>{recipes.length}</strong> recetas</span>
+                  <span>Mostrando <strong>1 - {filteredRecipesWithMeta.length}</strong> de <strong>{recipes.length}</strong> recetas</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-[#714500] font-semibold">Gusto • Cocina de Autor</span>

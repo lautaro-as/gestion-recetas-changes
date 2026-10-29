@@ -8,6 +8,7 @@ interface RecipeCardProps {
   onOpenDetail: (recipe: Recipe) => void;
   onOpenReport?: (recipe: Recipe) => void;
   onEditRecipe?: (recipe: Recipe) => void;
+  searchMatchReasons?: { type: string; label: string }[];
 }
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({
@@ -15,6 +16,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   onOpenDetail,
   onOpenReport,
   onEditRecipe,
+  searchMatchReasons,
 }) => {
   const {
     currentUser,
@@ -165,6 +167,22 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   +{recipe.tags.length - 3}
                 </span>
               )}
+            </div>
+          )}
+
+          {/* RF-16 Search Match Reason indicator */}
+          {searchMatchReasons && searchMatchReasons.length > 0 && (
+            <div className="mb-3 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-[#714500] font-medium animate-in fade-in duration-150">
+              <span className="material-symbols-outlined text-[14px] text-[#835500] shrink-0">
+                {searchMatchReasons[0].type === 'ingrediente'
+                  ? 'kitchen'
+                  : searchMatchReasons[0].type === 'categoria'
+                  ? 'dinner_dining'
+                  : searchMatchReasons[0].type === 'palabra_clave'
+                  ? 'auto_awesome'
+                  : 'search'}
+              </span>
+              <span className="truncate">Coincide {searchMatchReasons[0].label}</span>
             </div>
           )}
         </div>
