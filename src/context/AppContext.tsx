@@ -488,7 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newRecipe.status === 'scheduled') {
       showToast(`Receta "${newRecipe.title}" programada para el ${new Date(newRecipe.scheduledPublishDate || '').toLocaleDateString('es-ES')}.`);
     } else if (newRecipe.status === 'draft') {
-      showToast(`Borrador de "${newRecipe.title}" guardado en tu espacio personal.`);
+      showToast(`Borrador de "${newRecipe.title}" guardado en tu perfil personal.`);
     } else {
       showToast(`¡Receta "${newRecipe.title}" publicada en la comunidad!`);
     }
@@ -1231,7 +1231,7 @@ Gusto - Sistema de Gestión de Recetas.
   const exportWeeklyPlannerPdf = (): boolean => {
     const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
     if (!isPremiumOrAdmin) {
-      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi Espacio para descargar el Planificador Semanal en formato .PDF');
+      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi perfil para descargar el Planificador Semanal en formato .PDF');
       return false;
     }
     const famous = getFamousWeeklyRecipes();
@@ -1247,7 +1247,7 @@ Gusto - Sistema de Gestión de Recetas.
   const exportRecipePackagePdf = (collection?: RecipeCollection): boolean => {
     const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
     if (!isPremiumOrAdmin) {
-      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi Espacio para exportar paquetes de recetas en formato .PDF');
+      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi perfil para exportar paquetes de recetas en formato .PDF');
       return false;
     }
 

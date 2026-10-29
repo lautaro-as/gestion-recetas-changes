@@ -147,7 +147,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
                 type="button"
               >
-                Mi espacio
+                Mi perfil
               </button>
 
               {isStaff && (
@@ -485,7 +485,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
             type="button"
           >
-            Mi espacio
+            Mi perfil
           </button>
           {isStaff && (
             <button

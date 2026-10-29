@@ -415,7 +415,7 @@ function AppContent() {
                       recipe={recipe}
                       onOpenDetail={(r) => setSelectedRecipeDetail(r)}
                       onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}
-                      onOpenUserProfile={(u) => setSelectedUserProfile(u)}
+                      onEditRecipe={handleEditRecipe}
                     />
                   ))}
                 </div>
@@ -455,7 +455,7 @@ function AppContent() {
           />
         )}
 
-        {/* VIEW 5: Mi Espacio Personal & Perfil */}
+        {/* VIEW 5: Mi Perfil Personal */}
         {activeView === 'perfil' && (
           <UserProfileView
             onOpenDetail={(r) => setSelectedRecipeDetail(r)}
