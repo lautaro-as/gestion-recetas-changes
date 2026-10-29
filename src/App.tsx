@@ -21,6 +21,7 @@ import { PrintRecipeView } from './components/PrintRecipeView';
 import { AuthModals } from './components/AuthModals';
 import { ReportModal } from './components/ReportModal';
 import { PublicProfileModal } from './components/PublicProfileModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   Sparkles,
   ChefHat,
@@ -42,7 +43,6 @@ function AppContent() {
     followUserToggle,
     printableRecipe,
     setPrintableRecipe,
-    selectSpecificUser,
     toast,
   } = useApp();
 
@@ -198,7 +198,6 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#F3F3F3] text-[#333333] flex flex-col justify-between">
-      {/* Navbar with role switcher, notifications, cart badge - exactly based on Recetas Destacadas */}
       <Navbar
         activeView={activeView}
         setActiveView={setActiveView}
@@ -207,6 +206,12 @@ function AppContent() {
         onOpenAuth={(mode) => {
           setAuthInitialMode(mode || 'login');
           setIsAuthOpen(true);
+        }}
+        onSelectRecipeById={(recipeId) => {
+          const found = recipes.find((r) => r.id === recipeId);
+          if (found) {
+            setSelectedRecipeDetail(found);
+          }
         }}
       />
 
@@ -537,31 +542,34 @@ function AppContent() {
         </div>
       </footer>
 
-      {/* Modals and Drawers */}
-      <RecipeDetailModal
-        recipe={recipes.find((r) => r.id === selectedRecipeDetail?.id) || selectedRecipeDetail}
-        onClose={() => setSelectedRecipeDetail(null)}
-        onEditRecipe={handleEditRecipe}
-        onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}
-        onOpenUserProfile={(u) => setSelectedUserProfile(u)}
-      />
+      {/* Modals and Drawers wrapped in ErrorBoundary */}
+      <ErrorBoundary>
+        <RecipeDetailModal
+          recipe={recipes.find((r) => r.id === selectedRecipeDetail?.id) || selectedRecipeDetail}
+          onClose={() => setSelectedRecipeDetail(null)}
+          onEditRecipe={handleEditRecipe}
+          onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}
+          onOpenUserProfile={(u) => setSelectedUserProfile(u)}
+        />
 
-      <PublicProfileModal
-        user={allUsers.find((u) => u.id === selectedUserProfile?.id) || selectedUserProfile}
-        onClose={() => setSelectedUserProfile(null)}
-        onOpenRecipeDetail={(r) => setSelectedRecipeDetail(r)}
-        onOpenReport={handleOpenReport}
-        onSwitchUser={(userId) => selectSpecificUser(userId)}
-      />
+        <PublicProfileModal
+          user={allUsers.find((u) => u.id === selectedUserProfile?.id) || selectedUserProfile}
+          onClose={() => setSelectedUserProfile(null)}
+          onOpenRecipeDetail={(r) => setSelectedRecipeDetail(r)}
+          onOpenReport={handleOpenReport}
+          onSwitchUser={(userId) => selectSpecificUser(userId)}
+        />
 
-      <RecipeEditorModal
-        isOpen={isEditorOpen}
-        onClose={() => {
-          setIsEditorOpen(false);
-          setRecipeToEdit(null);
-        }}
-        recipeToEdit={recipeToEdit}
-      />
+        <RecipeEditorModal
+          key={recipeToEdit?.id ? `edit-${recipeToEdit.id}` : 'new-recipe'}
+          isOpen={isEditorOpen}
+          onClose={() => {
+            setIsEditorOpen(false);
+            setRecipeToEdit(null);
+          }}
+          recipeToEdit={recipeToEdit}
+        />
+      </ErrorBoundary>
 
       <ShoppingCartDrawer
         isOpen={isCartOpen}

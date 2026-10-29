@@ -12,7 +12,8 @@ import {
   RecipeCollection,
   Ingredient,
   SubProfile,
-  DietaryTag
+  DietaryTag,
+  RecipeStatus
 } from '../types';
 import {
   INITIAL_USERS,
@@ -25,6 +26,7 @@ import {
   INITIAL_NOTIFICATIONS
 } from '../data/seedData';
 import { downloadRecipePdf } from '../utils/recipePdfGenerator';
+import { downloadWeeklyPlannerPdf, downloadRecipePackagePdf } from '../utils/weeklyPlannerPdfGenerator';
 
 interface AppContextType {
   // Authentication & Users
@@ -50,6 +52,7 @@ interface AppContextType {
   toggleLikeRecipe: (recipeId: string) => void;
   toggleDislikeRecipe: (recipeId: string) => void;
   publishScheduledNow: (recipeId: string) => void;
+  changeRecipeStatus: (recipeId: string, newStatus: RecipeStatus, scheduledDate?: string) => void;
   
   // Comments
   comments: RecipeComment[];
@@ -106,6 +109,9 @@ interface AppContextType {
   exportRecipeJson: (recipe: Recipe) => void;
   exportRecipeText: (recipe: Recipe) => void;
   exportCollectionPackage: (collection: RecipeCollection) => void;
+  getFamousWeeklyRecipes: () => Recipe[];
+  exportWeeklyPlannerPdf: () => boolean;
+  exportRecipePackagePdf: (collection?: RecipeCollection) => boolean;
 
   // Toast System
   toast: string | null;
@@ -264,6 +270,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
   }, [notifications]);
+
+  // Check scheduled recipes periodically and auto-publish when due
+  useEffect(() => {
+    const checkScheduled = () => {
+      const now = Date.now();
+      let hasChanges = false;
+      const publishedList: Recipe[] = [];
+
+      setRecipes(prev => {
+        const next = prev.map(r => {
+          if (
+            r.status === 'scheduled' &&
+            r.scheduledPublishDate &&
+            new Date(r.scheduledPublishDate).getTime() <= now
+          ) {
+            hasChanges = true;
+            const updated: Recipe = {
+              ...r,
+              status: 'published',
+              updatedAt: new Date().toISOString()
+            };
+            publishedList.push(updated);
+            return updated;
+          }
+          return r;
+        });
+        return hasChanges ? next : prev;
+      });
+
+      if (publishedList.length > 0) {
+        const newNotifs: AppNotification[] = publishedList.map(r => ({
+          id: `notif-sched-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          userId: r.authorId,
+          title: 'Receta programada publicada',
+          message: `Tu receta programada "${r.title}" ha sido publicada automáticamente en la comunidad.`,
+          createdAt: new Date().toISOString(),
+          read: false,
+          type: 'scheduled_published',
+          linkTarget: r.id
+        }));
+        setNotifications(prev => [...newNotifs, ...prev]);
+      }
+    };
+
+    checkScheduled();
+    const interval = setInterval(checkScheduled, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -575,6 +629,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleLikeRecipe = (recipeId: string) => {
+    const targetRecipe = recipes.find(r => r.id === recipeId);
+    const wasAlreadyLiked = targetRecipe ? targetRecipe.likedUserIds.includes(currentUser.id) : false;
+
     setRecipes(prev => prev.map(r => {
       if (r.id !== recipeId) return r;
       const alreadyLiked = r.likedUserIds.includes(currentUser.id);
@@ -598,6 +655,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dislikesCount: Math.max(0, (r.dislikesCount ?? 0) + diffDislikes)
       };
     }));
+
+    // If adding a like (not unliking), notify the recipe owner
+    if (!wasAlreadyLiked && targetRecipe) {
+      const notif: AppNotification = {
+        id: `notif-like-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        userId: targetRecipe.authorId,
+        title: '¡A alguien le gustó tu receta!',
+        message: `A ${currentUser.name} le ha gustado tu receta "${targetRecipe.title}".`,
+        createdAt: new Date().toISOString(),
+        read: false,
+        type: 'like',
+        linkTarget: recipeId
+      };
+      setNotifications(prev => [notif, ...prev]);
+    }
   };
 
   const toggleDislikeRecipe = (recipeId: string) => {
@@ -627,17 +699,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const publishScheduledNow = (recipeId: string) => {
+    changeRecipeStatus(recipeId, 'published');
+  };
+
+  const changeRecipeStatus = (recipeId: string, newStatus: RecipeStatus, scheduledDate?: string) => {
+    const target = recipes.find(r => r.id === recipeId);
+    if (!target) return;
+
+    let isoScheduled: string | undefined = undefined;
+    if (newStatus === 'scheduled') {
+      try {
+        const d = scheduledDate ? new Date(scheduledDate) : new Date(Date.now() + 86400000 * 3);
+        isoScheduled = isNaN(d.getTime()) ? new Date(Date.now() + 86400000 * 3).toISOString() : d.toISOString();
+      } catch {
+        isoScheduled = new Date(Date.now() + 86400000 * 3).toISOString();
+      }
+    }
+
     setRecipes(prev => prev.map(r => {
       if (r.id === recipeId) {
         return {
           ...r,
-          status: 'published',
+          status: newStatus,
+          scheduledPublishDate: isoScheduled,
           updatedAt: new Date().toISOString()
         };
       }
       return r;
     }));
-    showToast('¡Receta programada publicada inmediatamente!');
+
+    if (newStatus === 'published') {
+      const notif: AppNotification = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        userId: target.authorId,
+        title: 'Receta publicada',
+        message: `Tu receta "${target.title}" ha sido publicada exitosamente en el catálogo.`,
+        createdAt: new Date().toISOString(),
+        read: false,
+        type: 'scheduled_published',
+        linkTarget: target.id
+      };
+      setNotifications(prev => [notif, ...prev]);
+      showToast(`¡Receta "${target.title}" publicada en la comunidad!`);
+    } else if (newStatus === 'draft') {
+      showToast(`Receta "${target.title}" guardada como borrador privado.`);
+    } else if (newStatus === 'scheduled') {
+      showToast(`Receta "${target.title}" programada para publicación automática.`);
+    }
   };
 
   // Comments
@@ -658,6 +766,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setComments(prev => [...prev, newComment]);
     setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, commentsCount: r.commentsCount + 1 } : r));
+
+    // Send notification to recipe owner
+    const targetRecipe = recipes.find(r => r.id === recipeId);
+    if (targetRecipe) {
+      const notif: AppNotification = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        userId: targetRecipe.authorId,
+        title: 'Nuevo comentario en tu receta',
+        message: `${currentUser.name} ha comentado en tu receta "${targetRecipe.title}".`,
+        createdAt: new Date().toISOString(),
+        read: false,
+        type: 'comment',
+        linkTarget: recipeId
+      };
+      setNotifications(prev => [notif, ...prev]);
+    }
+
+    // If replying to another comment, also notify parent comment author if different
+    if (parentCommentId) {
+      const parentComment = comments.find(c => c.id === parentCommentId);
+      if (parentComment && parentComment.authorId !== currentUser.id && parentComment.authorId !== targetRecipe?.authorId) {
+        const replyNotif: AppNotification = {
+          id: `notif-reply-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          userId: parentComment.authorId,
+          title: 'Respuesta a tu comentario',
+          message: `${currentUser.name} respondió a tu comentario en "${targetRecipe?.title || 'una receta'}".`,
+          createdAt: new Date().toISOString(),
+          read: false,
+          type: 'comment',
+          linkTarget: recipeId
+        };
+        setNotifications(prev => [replyNotif, ...prev]);
+      }
+    }
+
     showToast('Comentario publicado en la receta.');
   };
 
@@ -1016,8 +1159,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    showToast('Todas las notificaciones marcadas como leídas.');
+    setNotifications(prev => prev.map(n => n.userId === currentUser.id ? { ...n, read: true } : n));
+    showToast('Todas tus notificaciones marcadas como leídas.');
   };
 
   // Exporting & Printing
@@ -1079,24 +1222,66 @@ Gusto - Sistema de Gestión de Recetas.
     showToast(`Tarjeta de lectura rápida exportada.`);
   };
 
-  const exportCollectionPackage = (collection: RecipeCollection) => {
-    const collectedRecipes = recipes.filter(r => collection.recipeIds.includes(r.id));
-    const packData = {
-      collectionName: collection.name,
-      description: collection.description,
-      exportedAt: new Date().toISOString(),
+  const getFamousWeeklyRecipes = (): Recipe[] => {
+    return [...recipes]
+      .filter((r) => r.status === 'published')
+      .sort((a, b) => b.likesCount - a.likesCount);
+  };
+
+  const exportWeeklyPlannerPdf = (): boolean => {
+    const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
+    if (!isPremiumOrAdmin) {
+      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi Espacio para descargar el Planificador Semanal en formato .PDF');
+      return false;
+    }
+    const famous = getFamousWeeklyRecipes();
+    downloadWeeklyPlannerPdf({
+      famousRecipes: famous.length > 0 ? famous : recipes,
+      currentUser,
+      weekTitle: 'Planificador Semanal Gourmet Gusto'
+    });
+    showToast('Planificador semanal exportado exitosamente en formato .PDF');
+    return true;
+  };
+
+  const exportRecipePackagePdf = (collection?: RecipeCollection): boolean => {
+    const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
+    if (!isPremiumOrAdmin) {
+      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi Espacio para exportar paquetes de recetas en formato .PDF');
+      return false;
+    }
+
+    if (collection) {
+      const collectedRecipes = recipes.filter((r) => collection.recipeIds.includes(r.id));
+      if (collectedRecipes.length === 0) {
+        showToast('Esta colección aún no tiene recetas agregadas.');
+        return false;
+      }
+      downloadRecipePackagePdf({
+        packageName: collection.name,
+        description: collection.description || 'Colección privada seleccionada de recetas.',
+        recipes: collectedRecipes,
+        curatedBy: currentUser.name,
+      });
+      showToast(`Paquete culinario "${collection.name}" exportado exitosamente en formato .PDF`);
+      return true;
+    }
+
+    // Default package: Recetas más famosas de la semana
+    const famous = getFamousWeeklyRecipes();
+    const targetRecipes = famous.slice(0, 7);
+    downloadRecipePackagePdf({
+      packageName: 'Las Recetas Más Famosas de la Semana',
+      description: 'Edición exclusiva con las preparaciones más aclamadas y votadas por la comunidad culinaria de Gusto.',
+      recipes: targetRecipes,
       curatedBy: currentUser.name,
-      totalRecipes: collectedRecipes.length,
-      recipes: collectedRecipes
-    };
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(packData, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `planificador_${collection.name.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    showToast(`Paquete de recetas y planificador semanal descargado.`);
+    });
+    showToast('Paquete de recetas más famosas exportado exitosamente en formato .PDF');
+    return true;
+  };
+
+  const exportCollectionPackage = (collection: RecipeCollection) => {
+    exportRecipePackagePdf(collection);
   };
 
   return (
@@ -1123,6 +1308,7 @@ Gusto - Sistema de Gestión de Recetas.
         toggleLikeRecipe,
         toggleDislikeRecipe,
         publishScheduledNow,
+        changeRecipeStatus,
 
         comments,
         addComment,
@@ -1171,6 +1357,9 @@ Gusto - Sistema de Gestión de Recetas.
         exportRecipeJson,
         exportRecipeText,
         exportCollectionPackage,
+        getFamousWeeklyRecipes,
+        exportWeeklyPlannerPdf,
+        exportRecipePackagePdf,
 
         toast,
         showToast

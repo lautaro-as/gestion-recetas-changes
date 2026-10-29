@@ -29,16 +29,22 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     collections,
     createCollection,
     exportCollectionPackage,
+    exportWeeklyPlannerPdf,
+    exportRecipePackagePdf,
+    exportRecipePdf,
+    getFamousWeeklyRecipes,
+    switchUserRole,
     updateUserProfile,
     addSubProfile,
     switchActiveSubProfile,
     followUserToggle,
     selectSpecificUser,
+    publishScheduledNow,
     showToast,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<
-    'creadas' | 'borradores' | 'programadas' | 'colecciones' | 'deseos' | 'explorar_cocineros'
+    'creadas' | 'borradores' | 'programadas' | 'colecciones' | 'deseos' | 'planificador_premium' | 'explorar_cocineros'
   >('creadas');
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -444,7 +450,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <p className="text-sm font-bold text-[#1B1C1C] truncate">
               {myCollections.length} Colecciones creadas
             </p>
-            <span className="text-xs text-[#514536] font-medium">Exportación JSON / PDF</span>
+            <span className="text-xs text-[#835500] font-semibold">Planificador & Paquetes .PDF</span>
           </div>
         </div>
 
@@ -529,6 +535,22 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <span>Colecciones</span>
             <span className="bg-stone-200 text-stone-800 px-1.5 py-0.2 rounded-full text-[11px]">
               {myCollections.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('planificador_premium')}
+            className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'planificador_premium'
+                ? 'bg-gradient-to-r from-[#835500] to-[#E09F3E] text-white shadow-sm ring-2 ring-[#E09F3E]/40'
+                : 'text-[#835500] bg-amber-50 hover:bg-amber-100/90 font-bold border border-amber-200/70'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+            <span>Planificador Semanal PDF</span>
+            <span className="bg-[#835500] text-amber-100 text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+              Premium
             </span>
           </button>
 
@@ -742,17 +764,37 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               {myScheduled.map((recipe) => (
                 <div key={recipe.id} className="flex flex-col gap-2">
                   {recipe.scheduledPublishDate && (
-                    <div className="bg-amber-50 text-amber-900 border border-amber-200/90 px-3 py-1.5 rounded-2xl text-xs font-semibold flex items-center gap-1.5 shadow-xs">
-                      <span className="material-symbols-outlined text-[16px] text-[#835500]">schedule</span>
-                      <span>
-                        Se publicará: <strong>{new Date(recipe.scheduledPublishDate).toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}</strong>
-                      </span>
+                    <div className="bg-amber-50 text-amber-900 border border-amber-200/90 px-3 py-2 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2 shadow-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="material-symbols-outlined text-[16px] text-[#835500] shrink-0">schedule</span>
+                        <span className="truncate">
+                          Se publicará: <strong>{(() => {
+                            try {
+                              const d = new Date(recipe.scheduledPublishDate);
+                              return isNaN(d.getTime())
+                                ? 'Próximamente'
+                                : d.toLocaleDateString('es-ES', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  });
+                            } catch {
+                              return 'Próximamente';
+                            }
+                          })()}</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => publishScheduledNow(recipe.id)}
+                        className="px-2.5 py-1 bg-[#E09F3E] hover:bg-[#835500] text-white rounded-xl text-[11px] font-bold shadow-xs cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
+                        title="Publicar esta receta inmediatamente"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">schedule_send</span>
+                        <span>Publicar ahora</span>
+                      </button>
                     </div>
                   )}
                   <RecipeCard
@@ -771,6 +813,36 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       {/* 4. COLECCIONES CULINARIAS */}
       {activeTab === 'colecciones' && (
         <div className="space-y-4">
+          {/* Banner Planificador Semanal PDF */}
+          <div className="p-4 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-400/10 to-amber-600/10 border border-amber-300/70 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 rounded-2xl bg-[#835500] text-white shadow-xs">
+                <span className="material-symbols-outlined text-[24px]">calendar_month</span>
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#835500]">
+                    [RF-30] Planificador Semanal & Paquetes .PDF
+                  </span>
+                  <span className="bg-[#835500] text-amber-100 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                    Premium
+                  </span>
+                </div>
+                <p className="text-xs text-stone-700 font-medium">
+                  Genera el menú semanal de 7 días con las recetas más famosas de la semana y lista consolidada de compras en formato PDF.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('planificador_premium')}
+              className="px-4 py-2 rounded-full bg-[#835500] hover:bg-[#664200] text-white text-xs font-bold shrink-0 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Ver Planificador Semanal</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          </div>
+
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#1B1C1C]">
               Tus colecciones y paquetes culinarios
@@ -851,15 +923,19 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                     <p className="text-xs text-stone-500 line-clamp-2">{col.description}</p>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
+                  <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => exportCollectionPackage(col)}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[#835500] hover:underline"
+                      onClick={() => exportRecipePackagePdf(col)}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold bg-[#E09F3E] hover:bg-[#835500] text-white px-3.5 py-1.5 rounded-full shadow-xs cursor-pointer transition-colors"
+                      title="Descargar recetas de esta colección en formato digital .PDF"
                     >
-                      <span className="material-symbols-outlined text-[16px]">download</span>
-                      <span>Exportar paquete JSON</span>
+                      <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                      <span>Exportar paquete (.PDF)</span>
                     </button>
+                    <span className="text-[10px] font-bold text-amber-900/70 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+                      Premium .PDF
+                    </span>
                   </div>
                 </div>
               ))}
@@ -893,7 +969,290 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </div>
       )}
 
-      {/* 6. BUSCAR COCINEROS */}
+      {/* 6. PLANIFICADOR SEMANAL Y PAQUETES DE RECETAS EN PDF (RF-30) */}
+      {activeTab === 'planificador_premium' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="relative rounded-3xl bg-gradient-to-br from-[#835500] via-[#A86E00] to-[#E09F3E] text-white p-6 sm:p-8 shadow-md overflow-hidden">
+            <div className="absolute top-0 right-0 -mr-10 -mt-10 w-60 h-60 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-1.5 bg-black/20 backdrop-blur-xs px-3 py-1 rounded-full text-xs font-bold text-amber-200">
+                  <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
+                  <span>[RF-30] Módulo Exclusivo Premium</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold tracking-tight">
+                  Planificador Semanal & Paquetes de Recetas (.PDF)
+                </h3>
+                <p className="text-xs sm:text-sm text-amber-100 leading-relaxed">
+                  Exporta menús semanales de 7 días, listas de compras para el supermercado y paquetes compilados con las recetas más famosas y votadas de la semana en formato digital PDF de alta calidad.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="shrink-0 bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/20 text-center sm:text-right">
+                <span className="text-[11px] uppercase tracking-wider text-amber-200 font-bold block mb-1">
+                  Tu Estado Actual
+                </span>
+                <span className="text-sm font-bold text-white flex items-center justify-center sm:justify-end gap-1.5">
+                  <span className="material-symbols-outlined text-[18px]">
+                    {currentUser.role === 'premium' || currentUser.role === 'admin' ? 'verified' : 'lock'}
+                  </span>
+                  {currentUser.role === 'premium'
+                    ? 'Socio Premium Activo'
+                    : currentUser.role === 'admin'
+                    ? 'Administrador (Acceso Total)'
+                    : 'Cuenta Estándar (Bloqueado)'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Premium Check & Upgrade Callout */}
+          {!(currentUser.role === 'premium' || currentUser.role === 'admin') && (
+            <div className="rounded-3xl bg-white border-2 border-amber-300 p-6 sm:p-8 shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-[#835500] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[28px]">lock_person</span>
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <h4 className="text-base font-bold text-stone-900">
+                    Beneficio Exclusivo para Usuarios Premium
+                  </h4>
+                  <p className="text-xs text-stone-600 leading-relaxed">
+                    La descarga y exportación de <strong>paquetes de recetas</strong> y <strong>planificadores semanales en formato .PDF</strong> está reservada para miembros con rol Premium. Como usuario actual con rol <strong>"{currentUser.role}"</strong>, puedes activar el rol Premium instantáneamente con un solo clic para probar y descargar los documentos en PDF.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    switchUserRole('premium');
+                    showToast('⭐ ¡Membresía Premium activada! Ahora puedes descargar el Planificador Semanal y Paquetes en PDF.');
+                  }}
+                  className="px-5 py-3 rounded-full bg-[#835500] hover:bg-[#664200] text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+                  <span>Activar Rol Premium Ahora</span>
+                </button>
+              </div>
+
+              {/* What is included preview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-stone-100">
+                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60 text-xs space-y-1">
+                  <span className="font-bold text-stone-800 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-[#835500]">calendar_view_week</span>
+                    Menú Semanal 7 Días
+                  </span>
+                  <p className="text-stone-500 text-[11px]">
+                    Planificación estructurada de almuerzo y cena con tiempos exactos y porciones.
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60 text-xs space-y-1">
+                  <span className="font-bold text-stone-800 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-[#835500]">shopping_cart_checkout</span>
+                    Lista de Compras Consolidada
+                  </span>
+                  <p className="text-stone-500 text-[11px]">
+                    Ingredientes agrupados por categoría (frescos, lácteos, despensa) con casillas para tildar en el súper.
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60 text-xs space-y-1">
+                  <span className="font-bold text-stone-800 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-[#835500]">picture_as_pdf</span>
+                    Formato .PDF Digital
+                  </span>
+                  <p className="text-stone-500 text-[11px]">
+                    Archivo vectorizado de rápida lectura para móvil, tablet o impresión física en cocina.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Download Action Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Card 1: Planificador Semanal PDF */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-stone-200/70 flex flex-col justify-between relative overflow-hidden group hover:border-amber-300 transition-all">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-[#835500] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[28px]">calendar_month</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#835500] bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                    Formato .PDF Oficial
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="text-base font-bold text-stone-900 group-hover:text-[#835500] transition-colors">
+                    Planificador Semanal Gourmet (.PDF)
+                  </h4>
+                  <p className="text-xs text-stone-500 leading-relaxed">
+                    Genera y descarga un planificador completo de 7 días integrado con las <strong>recetas más famosas de la semana</strong>. Contiene asignación diaria, valores nutricionales consolidados, lista unificada de compras para el supermercado con casillas de verificación e indicaciones de Meal Prep.
+                  </p>
+                </div>
+
+                <div className="bg-[#FAF8F5] p-3 rounded-2xl border border-stone-200/50 space-y-1.5 text-xs text-stone-700">
+                  <div className="flex items-center gap-1.5 font-semibold text-[#835500]">
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Incluye las {Math.min(7, getFamousWeeklyRecipes().length)} recetas más famosas y votadas</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-stone-600 text-[11px]">
+                    <span className="material-symbols-outlined text-[15px]">done</span>
+                    <span>Lista de ingredientes clasificados para compras</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-stone-600 text-[11px]">
+                    <span className="material-symbols-outlined text-[15px]">done</span>
+                    <span>Consejos de Batch Cooking dominical</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <button
+                  type="button"
+                  onClick={() => exportWeeklyPlannerPdf()}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#835500] hover:bg-[#664200] text-white text-xs sm:text-sm font-bold py-3 px-5 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">download</span>
+                  <span>Descargar Planificador Semanal (.PDF)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Card 2: Paquete de Recetas Más Famosas PDF */}
+            <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-stone-200/70 flex flex-col justify-between relative overflow-hidden group hover:border-amber-300 transition-all">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-[#835500] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[28px]">menu_book</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#835500] bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                    Cookbook Bundle .PDF
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="text-base font-bold text-stone-900 group-hover:text-[#835500] transition-colors">
+                    Paquete: Las Recetas Más Famosas de la Semana (.PDF)
+                  </h4>
+                  <p className="text-xs text-stone-500 leading-relaxed">
+                    Descarga un libro digital en PDF con la recopilación completa de las recetas con mayor ranking, likes y calificaciones de la comunidad culinaria. Incluye índice, ingredientes con cantidades exactas, y pasos detallados con consejos del chef.
+                  </p>
+                </div>
+
+                <div className="bg-[#FAF8F5] p-3 rounded-2xl border border-stone-200/50 space-y-1.5 text-xs text-stone-700">
+                  <div className="flex items-center gap-1.5 font-semibold text-[#835500]">
+                    <span className="material-symbols-outlined text-[16px]">stars</span>
+                    <span>Selección de recetas con más de 100+ votos en Gusto</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-stone-600 text-[11px]">
+                    <span className="material-symbols-outlined text-[15px]">done</span>
+                    <span>Paso a paso extendido con consejos del chef</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-stone-600 text-[11px]">
+                    <span className="material-symbols-outlined text-[15px]">done</span>
+                    <span>Información nutricional por ración detallada</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <button
+                  type="button"
+                  onClick={() => exportRecipePackagePdf()}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#E09F3E] hover:bg-[#835500] text-white text-xs sm:text-sm font-bold py-3 px-5 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+                  <span>Descargar Paquete de Recetas Famosas (.PDF)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Preview of the Week's Most Famous Recipes */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-stone-200/70 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-4">
+              <div>
+                <h4 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#835500] text-[22px]">local_fire_department</span>
+                  <span>Recetas Más Famosas de la Semana en este Planificador</span>
+                </h4>
+                <p className="text-xs text-stone-500">
+                  Ordenadas por mayor número de "Me Gusta" y popularidad dentro de la plataforma.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-stone-500 bg-stone-100 px-3 py-1 rounded-full w-fit">
+                {getFamousWeeklyRecipes().length} recetas publicadas analizadas
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {getFamousWeeklyRecipes().slice(0, 7).map((recipe, index) => (
+                <div
+                  key={recipe.id}
+                  className="rounded-2xl border border-stone-200/80 p-4 bg-[#FCFAFA] hover:bg-white hover:border-amber-300 transition-all flex flex-col justify-between group shadow-xs"
+                >
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-[#835500]">
+                        <span className="material-symbols-outlined text-[13px]">military_tech</span>
+                        Top #{index + 1}
+                      </span>
+                      <span className="text-xs font-bold text-rose-600 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[15px]">favorite</span>
+                        {recipe.likesCount}
+                      </span>
+                    </div>
+
+                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-stone-100 relative">
+                      <img
+                        src={recipe.coverImage}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs">
+                        {recipe.category}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h5 className="font-bold text-xs sm:text-sm text-stone-900 line-clamp-1 group-hover:text-[#835500] transition-colors">
+                        {recipe.title}
+                      </h5>
+                      <p className="text-[11px] text-stone-500">
+                        Chef {recipe.authorName} • {recipe.prepTimeMin + recipe.cookTimeMin} min
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetail(recipe)}
+                      className="text-xs font-bold text-[#835500] hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">visibility</span>
+                      <span>Ver receta</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportRecipePdf(recipe)}
+                      className="text-[11px] font-semibold text-stone-600 hover:text-[#835500] flex items-center gap-1 cursor-pointer"
+                      title="Descargar PDF individual de lectura rápida"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">download</span>
+                      <span>PDF</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. BUSCAR COCINEROS */}
       {activeTab === 'explorar_cocineros' && (
         <div className="space-y-4">
           <div className="bg-white rounded-3xl p-4 shadow-sm border border-stone-200/60 flex items-center gap-3">

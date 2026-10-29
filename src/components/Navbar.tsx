@@ -8,6 +8,7 @@ interface NavbarProps {
   onOpenCreateRecipe: () => void;
   onOpenCart: () => void;
   onOpenAuth: (mode?: 'login' | 'register') => void;
+  onSelectRecipeById?: (recipeId: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -16,6 +17,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateRecipe,
   onOpenCart,
   onOpenAuth,
+  onSelectRecipeById,
 }) => {
   const {
     currentUser,
@@ -32,7 +34,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
 
-  const unreadNotifs = notifications.filter((n) => !n.read);
+  // Filter notifications strictly for the active user session (RF-28)
+  const userNotifications = notifications.filter((n) => n.userId === currentUser.id);
+  const unreadNotifs = userNotifications.filter((n) => !n.read);
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -242,29 +246,85 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
                   </div>
-                  <div className="max-h-72 overflow-y-auto divide-y divide-stone-100">
-                    {notifications.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-stone-400">
-                        No tienes notificaciones por ahora.
+                  <div className="max-h-80 overflow-y-auto divide-y divide-stone-100">
+                    {userNotifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-stone-400 space-y-1">
+                        <span className="material-symbols-outlined text-[28px] text-stone-300 block mx-auto">
+                          notifications_none
+                        </span>
+                        <p className="font-semibold text-stone-600">No tienes notificaciones por ahora.</p>
+                        <p className="text-[11px] text-stone-400">
+                          Recibirás alertas cuando alguien te siga, comente tus recetas o se publique una receta programada.
+                        </p>
                       </div>
                     ) : (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          onClick={() => markNotificationAsRead(notif.id)}
-                          className={`p-3.5 hover:bg-[#F6F3F2] cursor-pointer transition-colors ${
-                            !notif.read ? 'bg-[#FFDDB9]/20' : ''
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-bold text-stone-900">{notif.title}</span>
-                            <span className="text-[10px] text-stone-400">
-                              {new Date(notif.createdAt).toLocaleDateString('es-ES')}
+                      userNotifications.map((notif) => {
+                        const getNotifIconConfig = (type: typeof notif.type) => {
+                          switch (type) {
+                            case 'follow':
+                              return { icon: 'person_add', bg: 'bg-amber-600' };
+                            case 'comment':
+                              return { icon: 'chat_bubble', bg: 'bg-sky-600' };
+                            case 'scheduled_published':
+                              return { icon: 'schedule_send', bg: 'bg-emerald-600' };
+                            case 'like':
+                              return { icon: 'favorite', bg: 'bg-rose-500' };
+                            case 'moderation':
+                              return { icon: 'security', bg: 'bg-purple-600' };
+                            default:
+                              return { icon: 'notifications', bg: 'bg-[#835500]' };
+                          }
+                        };
+                        const iconCfg = getNotifIconConfig(notif.type);
+
+                        return (
+                          <div
+                            key={notif.id}
+                            onClick={() => {
+                              markNotificationAsRead(notif.id);
+                              if (notif.linkTarget && onSelectRecipeById) {
+                                onSelectRecipeById(notif.linkTarget);
+                                setShowNotifMenu(false);
+                              }
+                            }}
+                            className={`p-3.5 hover:bg-[#F6F3F2] cursor-pointer transition-colors flex items-start gap-3 ${
+                              !notif.read ? 'bg-[#FFDDB9]/25 font-medium' : ''
+                            }`}
+                          >
+                            <span
+                              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white ${iconCfg.bg}`}
+                            >
+                              <span className="material-symbols-outlined text-[16px]">
+                                {iconCfg.icon}
+                              </span>
                             </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-xs font-bold text-stone-900 truncate">
+                                  {notif.title}
+                                </span>
+                                <span className="text-[10px] text-stone-400 shrink-0 ml-2">
+                                  {new Date(notif.createdAt).toLocaleDateString('es-ES', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </span>
+                              </div>
+                              <p className="text-xs text-stone-600 leading-snug break-words">
+                                {notif.message}
+                              </p>
+                              {notif.linkTarget && (
+                                <span className="text-[10px] text-[#835500] font-semibold underline mt-1 inline-block">
+                                  Ver receta →
+                                </span>
+                              )}
+                            </div>
+                            {!notif.read && (
+                              <span className="w-2 h-2 rounded-full bg-[#E09F3E] shrink-0 mt-1.5" />
+                            )}
                           </div>
-                          <p className="text-xs text-stone-600 leading-snug">{notif.message}</p>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>

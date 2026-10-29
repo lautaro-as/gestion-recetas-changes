@@ -67,6 +67,8 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
     exportRecipePdf,
     exportRecipeJson,
     exportRecipeText,
+    publishScheduledNow,
+    changeRecipeStatus,
     showToast
   } = useApp();
 
@@ -78,6 +80,27 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   const [selectedIngredientIds, setSelectedIngredientIds] = useState<string[]>([]);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [inlineScheduledDate, setInlineScheduledDate] = useState(() => {
+    return new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16);
+  });
+
+  const formatScheduledDate = (dateStr?: string | null): string => {
+    if (!dateStr) return 'Fecha pendiente';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return 'Fecha pendiente';
+      return d.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return 'Fecha pendiente';
+    }
+  };
 
   if (!initialRecipe) return null;
   const recipe = recipes.find((r) => r.id === initialRecipe.id) || initialRecipe;
@@ -289,6 +312,150 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Interactive Publication Status Control (Allows changing to published, draft, or scheduled without closing recipe) */}
+          {canEdit ? (
+            <div className="bg-amber-50/70 border border-amber-200/90 rounded-3xl p-4 sm:p-5 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-2xl bg-amber-500/20 text-[#835500] flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[24px]">
+                      {recipe.status === 'published'
+                        ? 'check_circle'
+                        : recipe.status === 'scheduled'
+                        ? 'schedule'
+                        : 'save'}
+                    </span>
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-stone-900">
+                        Estado de Publicación:
+                      </h4>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          recipe.status === 'published'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : recipe.status === 'scheduled'
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : 'bg-stone-200 text-stone-800 border border-stone-300'
+                        }`}
+                      >
+                        {recipe.status === 'published'
+                          ? 'Publicada'
+                          : recipe.status === 'scheduled'
+                          ? 'Programada'
+                          : 'Borrador'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 mt-0.5">
+                      {recipe.status === 'published' && 'Visible de inmediato para toda la comunidad culinaria.'}
+                      {recipe.status === 'draft' && 'Privado: solo visible para ti en tu perfil personal.'}
+                      {recipe.status === 'scheduled' &&
+                        `Se publicará automáticamente el ${formatScheduledDate(recipe.scheduledPublishDate)}.`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Status Buttons */}
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  {recipe.status !== 'published' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        changeRecipeStatus(recipe.id, 'published');
+                        setShowDatePicker(false);
+                      }}
+                      className="px-3.5 py-1.5 bg-[#E09F3E] hover:bg-[#835500] text-white rounded-full text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">schedule_send</span>
+                      <span>Publicar ahora</span>
+                    </button>
+                  )}
+
+                  {recipe.status !== 'draft' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        changeRecipeStatus(recipe.id, 'draft');
+                        setShowDatePicker(false);
+                      }}
+                      className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-full text-xs font-semibold transition-colors cursor-pointer border border-stone-300 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">save</span>
+                      <span>Guardar en borrador</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer border flex items-center gap-1 ${
+                      showDatePicker || recipe.status === 'scheduled'
+                        ? 'bg-amber-100 border-amber-400 text-amber-900 font-bold'
+                        : 'bg-white border-stone-300 text-stone-700 hover:bg-stone-50'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">event</span>
+                    <span>{recipe.status === 'scheduled' ? 'Modificar fecha' : 'Programar receta'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline Schedule Date Picker */}
+              {showDatePicker && (
+                <div className="pt-3 border-t border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                    <span className="text-xs font-bold text-stone-700 shrink-0">
+                      Fecha y hora de publicación:
+                    </span>
+                    <input
+                      type="datetime-local"
+                      value={inlineScheduledDate}
+                      onChange={(e) => setInlineScheduledDate(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl border border-stone-300 text-xs font-semibold text-stone-800 focus:ring-2 focus:ring-[#E09F3E] outline-hidden"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setShowDatePicker(false)}
+                      className="px-3 py-1.5 text-xs text-stone-500 hover:text-stone-800 font-semibold cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        changeRecipeStatus(recipe.id, 'scheduled', inlineScheduledDate);
+                        setShowDatePicker(false);
+                      }}
+                      className="px-4 py-1.5 bg-[#E09F3E] hover:bg-[#835500] text-white rounded-full text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">event_available</span>
+                      <span>Confirmar Programación</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            recipe.status === 'scheduled' && (
+              <div className="bg-amber-50 border-2 border-amber-300/80 rounded-3xl p-4 sm:p-5 flex items-center gap-3 shadow-xs">
+                <span className="w-10 h-10 rounded-2xl bg-amber-500/20 text-[#835500] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[24px]">schedule</span>
+                </span>
+                <div>
+                  <h4 className="text-sm font-bold text-stone-900">
+                    Receta programada para publicación
+                  </h4>
+                  <p className="text-xs text-stone-600">
+                    Se publicará automáticamente el {formatScheduledDate(recipe.scheduledPublishDate)}.
+                  </p>
+                </div>
+              </div>
+            )
+          )}
 
           {/* Author, Co-authors & Follow bar */}
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-3xl bg-[#FFDDB9]/30 border border-[#E09F3E]/30">
