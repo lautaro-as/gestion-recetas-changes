@@ -307,9 +307,6 @@ function AppContent() {
                         <h3 className="font-bold text-sm sm:text-base text-stone-900 font-display">
                           Perfiles encontrados ({matchedUsers.length})
                         </h3>
-                        <span className="text-[10px] uppercase tracking-wider font-extrabold bg-[#FFDDB9] text-[#714500] px-2 py-0.5 rounded-full">
-                          RF-21
-                        </span>
                       </div>
                       <p className="text-xs text-stone-500">
                         Búsqueda de usuarios por alias (@{searchQuery.replace(/^@/, '')}) o nombre

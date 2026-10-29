@@ -822,7 +822,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[#835500]">
-                    [RF-30] Planificador Semanal & Paquetes .PDF
+                    Planificador Semanal & Paquetes .PDF
                   </span>
                   <span className="bg-[#835500] text-amber-100 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
                     Premium
@@ -979,7 +979,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               <div className="space-y-2 max-w-2xl">
                 <div className="inline-flex items-center gap-1.5 bg-black/20 backdrop-blur-xs px-3 py-1 rounded-full text-xs font-bold text-amber-200">
                   <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
-                  <span>[RF-30] Módulo Exclusivo Premium</span>
+                  <span>Módulo Exclusivo Premium</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold tracking-tight">
                   Planificador Semanal & Paquetes de Recetas (.PDF)

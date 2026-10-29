@@ -378,7 +378,7 @@ export const downloadWeeklyPlannerPdf = ({
     doc.setFontSize(7);
     doc.setTextColor(140, 130, 120);
     doc.text(
-      'Gusto Premium • [RF-30] Planificador Semanal & Menú de Recetas Famosas (.PDF)',
+      'Gusto Premium • Planificador Semanal & Menú de Recetas Famosas (.PDF)',
       marginX,
       pageHeight - 6.5
     );
