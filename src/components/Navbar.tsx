@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
+import { SwitchAccountModal } from './SwitchAccountModal';
 
 interface NavbarProps {
   activeView: string;
@@ -34,6 +35,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = useState(false);
 
   // Filter notifications strictly for the active user session (RF-28)
   const userNotifications = notifications.filter((n) => n.userId === currentUser.id);
@@ -60,8 +63,19 @@ export const Navbar: React.FC<NavbarProps> = ({
       <nav className="bg-[#E09F3E] text-white shadow-[0_4px_20px_-2px_rgba(197,130,38,0.25)]">
         <div className="h-16 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex items-center justify-between gap-4">
           
-          {/* Brand Logo */}
-          <div className="flex items-center gap-6 lg:gap-8">
+          {/* Brand Logo & Mobile Hamburger Trigger */}
+          <div className="flex items-center gap-2 sm:gap-6 lg:gap-8">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-white/20 text-white cursor-pointer transition-colors focus:outline-none flex items-center justify-center"
+              aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú de navegación'}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[28px]">
+                {isMobileMenuOpen ? 'close' : 'menu'}
+              </span>
+            </button>
+
             <button
               onClick={() => setActiveView('explorar')}
               className="flex items-center gap-2 cursor-pointer focus:outline-none"
@@ -186,22 +200,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="material-symbols-outlined text-[24px]">search</span>
             </button>
 
-            {/* Nueva Receta Button */}
+            {/* Nueva Receta Button (Hidden on mobile, visible on desktop) */}
             <button
               onClick={onOpenCreateRecipe}
-              className="inline-flex items-center gap-1.5 bg-white text-[#835500] font-semibold text-sm px-4 py-2 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:bg-[#FFF8F0] hover:text-[#5A3900] transition-all cursor-pointer"
+              className="hidden lg:inline-flex items-center gap-1.5 bg-white text-[#835500] font-semibold text-sm px-4 py-2 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:bg-[#FFF8F0] hover:text-[#5A3900] transition-all cursor-pointer"
               type="button"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
-              <span className="hidden sm:inline">Nueva receta</span>
+              <span>Nueva receta</span>
             </button>
 
-            {/* Shopping Cart Button */}
+            {/* Shopping Cart Button (Hidden on mobile, accessible via hamburger menu) */}
             <button
               onClick={onOpenCart}
               aria-label="Carrito de compras"
               title="Carrito de compras"
-              className="relative p-2 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer"
+              className="hidden lg:flex relative p-2 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer items-center justify-center"
               type="button"
             >
               <span className="material-symbols-outlined text-[24px]">shopping_cart</span>
@@ -332,18 +346,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Profile Avatar & Account Menu Trigger */}
+            {/* Profile Avatar & Account Menu Trigger (Hidden on mobile header, accessed via hamburger menu) */}
             {!isAuthenticated ? (
               <button
                 type="button"
                 onClick={() => onOpenAuth('login')}
-                className="inline-flex items-center gap-1.5 bg-white text-[#835500] hover:bg-[#FFF8F0] font-bold text-xs sm:text-sm px-4 py-2 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all cursor-pointer"
+                className="hidden lg:inline-flex items-center gap-1.5 bg-white text-[#835500] hover:bg-[#FFF8F0] font-bold text-xs sm:text-sm px-4 py-2 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">account_circle</span>
                 <span>Iniciar sesión</span>
               </button>
             ) : (
-              <div className="relative">
+              <div className="hidden lg:block relative">
                 <div
                   onClick={() => {
                     setShowRoleMenu(!showRoleMenu);
@@ -395,6 +409,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          setIsSwitchAccountModalOpen(true);
+                          setShowRoleMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 p-2.5 rounded-xl text-left text-xs font-semibold hover:bg-amber-50 text-stone-700 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[#835500] text-[18px]">
+                          switch_account
+                        </span>
+                        <span>Cambiar de cuenta (ventana)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
                           logoutUser();
                           setShowRoleMenu(false);
                         }}
@@ -409,11 +437,23 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     {/* Quick test seeder accounts */}
                     <div className="pt-2 border-t border-stone-100">
-                      <span className="text-[10px] uppercase font-bold text-stone-400 px-2 block mb-1">
-                        Cuentas Rápidas (Seeder):
-                      </span>
+                      <div className="flex items-center justify-between px-2 mb-1">
+                        <span className="text-[10px] uppercase font-bold text-stone-400">
+                          Cuentas Rápidas:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSwitchAccountModalOpen(true);
+                            setShowRoleMenu(false);
+                          }}
+                          className="text-[10px] text-amber-700 hover:underline font-semibold"
+                        >
+                          Ver todas
+                        </button>
+                      </div>
                       <div className="space-y-1 max-h-36 overflow-y-auto">
-                        {allUsers.slice(0, 4).map((u) => (
+                        {allUsers.slice(0, 5).map((u) => (
                           <button
                             key={u.id}
                             onClick={() => {
@@ -444,78 +484,361 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         </div>
 
-        {/* Mobile Navigation Bar */}
-        <div className="lg:hidden flex items-center justify-around py-2 px-2 bg-[#D08F2E] text-white text-xs font-semibold overflow-x-auto">
-          <button
-            onClick={() => setActiveView('explorar')}
-            className={`px-3 py-1 rounded-full transition-all shrink-0 ${
-              activeView === 'explorar'
-                ? 'bg-white text-[#5A3900] shadow-sm font-bold'
-                : 'text-white hover:bg-white/20'
-            }`}
-            type="button"
-          >
-            Explorar
-          </button>
-          <button
-            onClick={() => setActiveView('destacadas')}
-            className={`px-3 py-1 rounded-full transition-all shrink-0 ${
-              activeView === 'destacadas'
-                ? 'bg-white text-[#5A3900] shadow-sm font-bold'
-                : 'text-white hover:bg-white/20'
-            }`}
-            type="button"
-          >
-            Destacadas
-          </button>
-          <button
-            onClick={() => setActiveView('foro')}
-            className={`px-3 py-1 rounded-full transition-all shrink-0 ${
-              activeView === 'foro'
-                ? 'bg-white text-[#5A3900] shadow-sm font-bold'
-                : 'text-white hover:bg-white/20'
-            }`}
-            type="button"
-          >
-            Foro
-          </button>
-          <button
-            onClick={() => setActiveView('comparar')}
-            className={`px-3 py-1 rounded-full transition-all shrink-0 ${
-              activeView === 'comparar'
-                ? 'bg-white text-[#5A3900] shadow-sm font-bold'
-                : 'text-white hover:bg-white/20'
-            }`}
-            type="button"
-          >
-            Comparar ({comparingRecipeIds.length})
-          </button>
-          <button
-            onClick={() => setActiveView('perfil')}
-            className={`px-3 py-1 rounded-full transition-all shrink-0 ${
-              activeView === 'perfil'
-                ? 'bg-white text-[#5A3900] shadow-sm font-bold'
-                : 'text-white hover:bg-white/20'
-            }`}
-            type="button"
-          >
-            Mi perfil
-          </button>
-          {isStaff && (
-            <button
-              onClick={() => setActiveView('moderacion')}
-              className={`px-3 py-1 rounded-full transition-all shrink-0 ${
-                activeView === 'moderacion'
-                  ? 'bg-white text-[#5A3900] shadow-sm font-bold'
-                  : 'text-white hover:bg-white/20'
-              }`}
-              type="button"
-            >
-              Moderación
-            </button>
-          )}
-        </div>
+        {/* Mobile Hamburger Drawer Menu */}
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex">
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+
+            {/* Slide-out Drawer Panel */}
+            <div className="relative w-[85%] max-w-xs sm:max-w-sm bg-white shadow-2xl flex flex-col h-full z-10 text-stone-800 animate-in slide-in-from-left duration-200">
+              {/* Drawer Header */}
+              <div className="bg-[#E09F3E] text-white p-4 flex items-center justify-between shadow-xs shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="material-symbols-outlined text-[28px] text-white"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    room_service
+                  </span>
+                  <div>
+                    <span className="font-display text-xl font-bold tracking-tight text-white leading-none block">
+                      Gusto
+                    </span>
+                    <span className="text-[10px] text-white/85">
+                      Gestión de Recetas y Comunidad
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  type="button"
+                  aria-label="Cerrar menú"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              {/* Drawer Body: All Sections */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Nueva Receta Primary Button */}
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenCreateRecipe();
+                  }}
+                  className="w-full bg-[#E09F3E] text-white font-bold text-sm py-3 px-4 rounded-2xl shadow-sm hover:bg-[#c58226] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                  <span>Nueva Receta</span>
+                </button>
+
+                {/* Navigation Sections */}
+                <div className="space-y-1">
+                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-3 pb-1">
+                    Secciones de la Página
+                  </div>
+
+                  {/* Explorar */}
+                  <button
+                    onClick={() => {
+                      setActiveView('explorar');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
+                      activeView === 'explorar'
+                        ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
+                        : 'text-stone-700 hover:bg-stone-50'
+                    }`}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                        explore
+                      </span>
+                      <span>Explorar</span>
+                    </div>
+                    {activeView === 'explorar' && (
+                      <span className="w-2 h-2 rounded-full bg-[#E09F3E]" />
+                    )}
+                  </button>
+
+                  {/* Destacadas */}
+                  <button
+                    onClick={() => {
+                      setActiveView('destacadas');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
+                      activeView === 'destacadas'
+                        ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
+                        : 'text-stone-700 hover:bg-stone-50'
+                    }`}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                        auto_awesome
+                      </span>
+                      <span>Destacadas</span>
+                    </div>
+                    {activeView === 'destacadas' && (
+                      <span className="w-2 h-2 rounded-full bg-[#E09F3E]" />
+                    )}
+                  </button>
+
+                  {/* Foro */}
+                  <button
+                    onClick={() => {
+                      setActiveView('foro');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
+                      activeView === 'foro'
+                        ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
+                        : 'text-stone-700 hover:bg-stone-50'
+                    }`}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                        forum
+                      </span>
+                      <span>Foro y Comunidad</span>
+                    </div>
+                    {activeView === 'foro' && (
+                      <span className="w-2 h-2 rounded-full bg-[#E09F3E]" />
+                    )}
+                  </button>
+
+                  {/* Comparar */}
+                  <button
+                    onClick={() => {
+                      setActiveView('comparar');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
+                      activeView === 'comparar'
+                        ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
+                        : 'text-stone-700 hover:bg-stone-50'
+                    }`}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                        compare_arrows
+                      </span>
+                      <span>Comparar Recetas</span>
+                    </div>
+                    {comparingRecipeIds.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#E09F3E] text-white">
+                        {comparingRecipeIds.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Mi Perfil */}
+                  <button
+                    onClick={() => {
+                      setActiveView('perfil');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
+                      activeView === 'perfil'
+                        ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
+                        : 'text-stone-700 hover:bg-stone-50'
+                    }`}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                        person
+                      </span>
+                      <span>Mi Perfil</span>
+                    </div>
+                    {activeView === 'perfil' && (
+                      <span className="w-2 h-2 rounded-full bg-[#E09F3E]" />
+                    )}
+                  </button>
+
+                  {/* Moderación si es Staff */}
+                  {isStaff && (
+                    <button
+                      onClick={() => {
+                        setActiveView('moderacion');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
+                        activeView === 'moderacion'
+                          ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
+                          : 'text-stone-700 hover:bg-stone-50'
+                      }`}
+                      type="button"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-purple-700 text-[22px]">
+                          admin_panel_settings
+                        </span>
+                        <span>Moderación</span>
+                      </div>
+                      <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md">
+                        Staff
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick actions: Cart & Notifications */}
+                <div className="space-y-1 pt-2 border-t border-stone-100">
+                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-3 pb-1">
+                    Herramientas
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onOpenCart();
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-all cursor-pointer"
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                        shopping_cart
+                      </span>
+                      <span>Carrito de Compras</span>
+                    </div>
+                    {cart.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#E09F3E] text-white">
+                        {cart.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setShowNotifMenu(true);
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-all cursor-pointer"
+                    type="button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                        notifications
+                      </span>
+                      <span>Notificaciones</span>
+                    </div>
+                    {unreadNotifs.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#FF8A84] text-white">
+                        {unreadNotifs.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Drawer Bottom - User Section */}
+              <div className="p-4 bg-stone-50 border-t border-stone-200 shrink-0">
+                {!isAuthenticated ? (
+                  <div className="space-y-2">
+                    <div className="text-xs text-stone-600 mb-1">
+                      Inicia sesión para gestionar recetas, foros y listas de compras.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenAuth('login');
+                      }}
+                      className="w-full bg-[#E09F3E] text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs hover:bg-[#c58226] transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">login</span>
+                      <span>Iniciar Sesión</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenAuth('register');
+                      }}
+                      className="w-full bg-white text-stone-700 border border-stone-300 font-bold text-xs py-2.5 px-4 rounded-xl hover:bg-stone-100 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">person_add</span>
+                      <span>Registrarse</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* User profile row */}
+                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-stone-200 shadow-2xs">
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.name}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-[#E09F3E]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-xs text-stone-900 truncate">
+                          {currentUser.name}
+                        </div>
+                        <div className="text-[11px] text-stone-500 truncate">
+                          @{currentUser.username}
+                        </div>
+                        <span className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-full mt-0.5 ${roleBadge.color}`}>
+                          {roleBadge.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* User Actions: Cambiar de cuenta (ventana aparte) & Cerrar sesión */}
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          setIsSwitchAccountModalOpen(true);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          switch_account
+                        </span>
+                        <span>Cambiar de cuenta</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          logoutUser();
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-rose-600 text-[18px]">
+                          logout
+                        </span>
+                        <span>Cerrar sesión</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
+
+      {/* Ventana Aparte: Modal de Cambio de Cuenta */}
+      <SwitchAccountModal
+        isOpen={isSwitchAccountModalOpen}
+        onClose={() => setIsSwitchAccountModalOpen(false)}
+        onOpenAuth={onOpenAuth}
+      />
     </header>
   );
 };

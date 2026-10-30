@@ -16,7 +16,11 @@ import {
   AlertCircle,
   ShieldCheck,
   FileEdit,
-  Lock
+  Lock,
+  UserCheck,
+  UserX,
+  Search,
+  Info
 } from 'lucide-react';
 
 interface RecipeEditorModalProps {
@@ -595,79 +599,230 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
               </div>
 
               <div className="relative">
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-amber-600" />
-                  Co-autores Colaborativos
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-amber-600" />
+                    Co-autores y Colaboradores Registrados
+                  </span>
+                  <span className="text-[10px] text-stone-400 font-normal">
+                    Escribe @usuario para autocompletar
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ej. @lucianutri, @camicocina (escribe para autocompletar)"
-                  value={coAuthorsText}
-                  onFocus={() => setShowCollaboratorSuggestions(true)}
-                  onChange={(e) => {
-                    setCoAuthorsText(e.target.value);
-                    setShowCollaboratorSuggestions(true);
-                  }}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500"
-                />
 
-                {/* Autocomplete Dropdown List matching registered users */}
+                {/* Chips of currently added collaborators */}
                 {(() => {
-                  const currentToken = coAuthorsText.split(',').pop()?.trim().toLowerCase().replace(/^@/, '') || '';
-                  const suggestions = currentToken.length > 0
-                    ? allUsers.filter(u => {
-                        if (u.id === currentUser.id) return false;
-                        return u.name.toLowerCase().includes(currentToken) || u.username.toLowerCase().includes(currentToken);
-                      })
-                    : [];
+                  const currentTokens = coAuthorsText
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
 
-                  if (!showCollaboratorSuggestions || suggestions.length === 0) return null;
+                  if (currentTokens.length === 0) return null;
 
                   return (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-2xl shadow-xl border border-stone-200 py-1.5 z-30 max-h-48 overflow-y-auto">
-                      <div className="px-3 py-1 text-[10px] font-bold text-stone-400 uppercase">
-                        Usuarios sugeridos:
-                      </div>
-                      {suggestions.map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => {
-                            const parts = coAuthorsText.split(',');
-                            parts.pop();
-                            parts.push(`@${user.username}`);
-                            const updated = parts.map(p => p.trim()).filter(Boolean).join(', ');
-                            setCoAuthorsText(updated ? updated + ', ' : '');
-                            setShowCollaboratorSuggestions(false);
-                          }}
-                          className="w-full px-3 py-2 text-left hover:bg-amber-50 flex items-center justify-between transition-colors cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-2">
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              className="w-6 h-6 rounded-full object-cover"
-                            />
-                            <div>
-                              <span className="text-xs font-bold text-stone-900 group-hover:text-[#835500]">
-                                {user.name}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {currentTokens.map((token, idx) => {
+                        const cleanHandle = token.replace(/^@/, '').toLowerCase();
+                        const registeredUser = allUsers.find(
+                          (u) =>
+                            u.username.toLowerCase() === cleanHandle ||
+                            u.name.toLowerCase() === token.toLowerCase()
+                        );
+
+                        return (
+                          <span
+                            key={idx}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border shadow-2xs ${
+                              registeredUser
+                                ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                : 'bg-stone-100 text-stone-700 border-stone-200'
+                            }`}
+                          >
+                            {registeredUser ? (
+                              <img
+                                src={registeredUser.avatar}
+                                alt={registeredUser.name}
+                                className="w-4 h-4 rounded-full object-cover shrink-0"
+                              />
+                            ) : (
+                              <Users className="w-3 h-3 text-stone-500 shrink-0" />
+                            )}
+                            <span className="font-semibold">
+                              {registeredUser ? `@${registeredUser.username}` : token}
+                            </span>
+                            {registeredUser && (
+                              <span className="text-[10px] text-amber-700 font-normal hidden sm:inline">
+                                ({registeredUser.name})
                               </span>
-                              <span className="text-[11px] text-stone-400 ml-1.5">
-                                @{user.username}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="text-[11px] font-semibold text-[#835500] group-hover:underline">
-                            Etiquetar +
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newTokens = currentTokens.filter((_, i) => i !== idx);
+                                setCoAuthorsText(newTokens.join(', ') + (newTokens.length > 0 ? ', ' : ''));
+                              }}
+                              className="ml-0.5 text-stone-400 hover:text-stone-700 cursor-pointer p-0.5"
+                              title="Quitar colaborador"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
                           </span>
-                        </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}
 
-                <p className="text-[10px] text-stone-500 mt-1">
-                  Permite compartir la autoría con otros cocineros registrados en la plataforma.
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Ej. @juan, @lucianutri, @camicocina..."
+                    value={coAuthorsText}
+                    onFocus={() => setShowCollaboratorSuggestions(true)}
+                    onChange={(e) => {
+                      setCoAuthorsText(e.target.value);
+                      setShowCollaboratorSuggestions(true);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500 bg-white"
+                  />
+                  {coAuthorsText.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCollaboratorSuggestions(!showCollaboratorSuggestions)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-100 hover:bg-amber-100 cursor-pointer"
+                      title="Ver sugerencias de usuarios"
+                    >
+                      {showCollaboratorSuggestions ? 'Ocultar lista' : 'Ver lista'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete Dropdown List matching registered users (Max 7) */}
+                {(() => {
+                  if (!showCollaboratorSuggestions) return null;
+
+                  const rawLastToken = coAuthorsText.split(',').pop()?.trim() || '';
+                  const cleanQuery = rawLastToken.replace(/^@/, '').toLowerCase();
+
+                  // Find candidates excluding self
+                  const availableUsers = allUsers.filter((u) => u.id !== currentUser.id);
+
+                  let suggestions: typeof allUsers = [];
+                  let isFiltering = cleanQuery.length > 0;
+
+                  if (isFiltering) {
+                    // Match by username or name
+                    const matched = availableUsers.filter((u) => {
+                      const uUsername = u.username.toLowerCase();
+                      const uName = u.name.toLowerCase();
+                      return uUsername.includes(cleanQuery) || uName.includes(cleanQuery);
+                    });
+
+                    // Sort so users whose username/name starts with the query appear first
+                    matched.sort((a, b) => {
+                      const aUserStarts = a.username.toLowerCase().startsWith(cleanQuery);
+                      const bUserStarts = b.username.toLowerCase().startsWith(cleanQuery);
+                      if (aUserStarts && !bUserStarts) return -1;
+                      if (!aUserStarts && bUserStarts) return 1;
+                      return 0;
+                    });
+
+                    // RF: Maximum 7 users allowed in autocomplete list
+                    suggestions = matched.slice(0, 7);
+                  } else {
+                    // If focused but haven't typed or just placed comma, suggest up to 7 platform users
+                    suggestions = availableUsers.slice(0, 7);
+                  }
+
+                  return (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-2xl border border-stone-200 py-1.5 z-40 max-h-64 overflow-y-auto divide-y divide-stone-100">
+                      {/* Case 1: Search performed and NO matches found -> notify user */}
+                      {isFiltering && suggestions.length === 0 && (
+                        <div className="p-3 text-center bg-amber-50/70 border border-amber-200/80 rounded-xl m-1.5 text-stone-700">
+                          <div className="flex items-center justify-center gap-1.5 text-amber-800 font-bold text-xs">
+                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>No se encontraron coincidencias para "{rawLastToken}"</span>
+                          </div>
+                          <p className="text-[11px] text-stone-600 mt-1">
+                            No existe ningún usuario registrado con el alias o nombre <strong>"{rawLastToken}"</strong> en Gusto. Verifica que esté bien escrito o regístralo previamente.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Case 2: Suggestions found -> display max 7 users */}
+                      {suggestions.length > 0 && (
+                        <>
+                          <div className="px-3 py-1.5 bg-stone-50 flex items-center justify-between text-[10px] font-bold text-stone-500 uppercase tracking-wide">
+                            <span>
+                              {isFiltering
+                                ? `Usuarios encontrados (${suggestions.length} de máx. 7):`
+                                : `Usuarios sugeridos para colaborar (máx. 7):`}
+                            </span>
+                            <span className="text-[10px] text-amber-800 font-medium">
+                              Click para autocompletar
+                            </span>
+                          </div>
+
+                          {suggestions.map((user) => (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const parts = coAuthorsText.split(',');
+                                parts.pop();
+                                parts.push(`@${user.username}`);
+                                const updated = parts.map((p) => p.trim()).filter(Boolean).join(', ');
+                                setCoAuthorsText(updated ? updated + ', ' : '');
+                                setShowCollaboratorSuggestions(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-amber-50/80 flex items-center justify-between transition-colors cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <img
+                                  src={user.avatar}
+                                  alt={user.name}
+                                  className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-amber-400"
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs font-bold text-stone-900 group-hover:text-amber-800 truncate">
+                                      {user.name}
+                                    </span>
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-md font-semibold">
+                                      @{user.username}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-stone-400 truncate">
+                                    {user.specialties?.length ? user.specialties.slice(0, 2).join(' • ') : user.email}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <span className="text-[11px] font-bold text-amber-800 bg-amber-100/70 group-hover:bg-amber-600 group-hover:text-white px-2.5 py-1 rounded-lg shrink-0 transition-colors ml-2">
+                                + Incluir
+                              </span>
+                            </button>
+                          ))}
+                        </>
+                      )}
+
+                      <div className="px-3 py-1 bg-stone-50 flex items-center justify-between text-[10px] text-stone-400 border-t border-stone-100">
+                        <span>Límite estricto: hasta 7 sugerencias simultáneas</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCollaboratorSuggestions(false)}
+                          className="text-stone-500 hover:text-stone-800 underline cursor-pointer"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <p className="text-[10px] text-stone-500 mt-1 flex items-center gap-1">
+                  <Info className="w-3 h-3 text-stone-400 shrink-0" />
+                  Al incluir un colaborador registrado (ej. @juan), este podrá visualizar y editar conjuntamente esta receta.
                 </p>
               </div>
 
