@@ -4,6 +4,9 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'user-mateo',
     name: 'Mateo Rossi',
+    firstName: 'Mateo',
+    lastName: 'Rossi',
+    gender: 'Masculino',
     username: 'mateochef',
     email: 'mateo.rossi@gusto.app',
     password: 'password123',
@@ -29,6 +32,9 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'user-lucia',
     name: 'Lucía Valenzuela',
+    firstName: 'Lucía',
+    lastName: 'Valenzuela',
+    gender: 'Femenino',
     username: 'lucianutri',
     email: 'lucia.valenzuela@gusto.app',
     password: 'password123',
@@ -54,6 +60,9 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'user-camila',
     name: 'Camila Ríos',
+    firstName: 'Camila',
+    lastName: 'Ríos',
+    gender: 'Femenino',
     username: 'camicocina',
     email: 'camila.rios@gusto.app',
     password: 'password123',
@@ -71,6 +80,9 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'user-ignacio',
     name: 'Ignacio Gómez (Admin)',
+    firstName: 'Ignacio',
+    lastName: 'Gómez',
+    gender: 'Masculino',
     username: 'ignacioadmin',
     email: 'admin@gusto.app',
     password: 'password123',

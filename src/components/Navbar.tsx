@@ -21,6 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const {
     currentUser,
+    isAuthenticated,
     allUsers,
     selectSpecificUser,
     logoutUser,
@@ -332,100 +333,113 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Profile Avatar & Account Menu Trigger */}
-            <div className="relative">
-              <div
-                onClick={() => {
-                  setShowRoleMenu(!showRoleMenu);
-                  setShowNotifMenu(false);
-                }}
-                className="flex items-center gap-1 pl-1 cursor-pointer group"
-                title="Cambiar cuenta o perfil"
+            {!isAuthenticated ? (
+              <button
+                type="button"
+                onClick={() => onOpenAuth('login')}
+                className="inline-flex items-center gap-1.5 bg-white text-[#835500] hover:bg-[#FFF8F0] font-bold text-xs sm:text-sm px-4 py-2 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all cursor-pointer"
               >
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-8 h-8 rounded-full object-cover shadow-[0_0_0_2px_rgba(255,255,255,0.6)]"
-                />
-                <span className="material-symbols-outlined text-white text-[20px] transition-transform group-hover:translate-y-0.5">
-                  keyboard_arrow_down
-                </span>
-              </div>
+                <span className="material-symbols-outlined text-[18px]">account_circle</span>
+                <span>Iniciar sesión</span>
+              </button>
+            ) : (
+              <div className="relative">
+                <div
+                  onClick={() => {
+                    setShowRoleMenu(!showRoleMenu);
+                    setShowNotifMenu(false);
+                  }}
+                  className="flex items-center gap-1 pl-1 cursor-pointer group"
+                  title="Opciones de cuenta"
+                >
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    className="w-8 h-8 rounded-full object-cover shadow-[0_0_0_2px_rgba(255,255,255,0.6)]"
+                  />
+                  <span className="material-symbols-outlined text-white text-[20px] transition-transform group-hover:translate-y-0.5">
+                    keyboard_arrow_down
+                  </span>
+                </div>
 
-              {/* User Account / Role Switcher Popover */}
-              {showRoleMenu && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-stone-200 p-3 z-50 text-[#333333] space-y-2">
-                  <div className="px-3 py-2 border-b border-stone-100">
-                    <div className="font-bold text-sm text-stone-900">{currentUser.name}</div>
-                    <div className="text-xs text-stone-500">{currentUser.email}</div>
-                    <div className="text-[11px] font-medium text-[#835500] mt-1 flex items-center justify-between">
-                      <span>Rol: <strong>{currentUser.role.toUpperCase()}</strong></span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${roleBadge.color}`}>
-                        {roleBadge.label}
-                      </span>
+                {/* User Account Menu Popover */}
+                {showRoleMenu && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-3xl shadow-2xl border border-stone-200 p-3 z-50 text-[#333333] space-y-2">
+                    <div className="px-3 py-2 border-b border-stone-100">
+                      <div className="font-bold text-sm text-stone-900">{currentUser.name}</div>
+                      <div className="text-xs text-stone-500 truncate">{currentUser.email}</div>
+                      <div className="text-[11px] font-medium text-[#835500] mt-1 flex items-center justify-between">
+                        <span>Rol: <strong>{currentUser.role.toUpperCase()}</strong></span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${roleBadge.color}`}>
+                          {roleBadge.label}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Switch active persona for testing functional requirements */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-stone-400 px-3 block">
-                      Cambiar Cuenta de Prueba:
-                    </span>
-                    {allUsers.map((u) => (
+                    {/* Primary actions */}
+                    <div className="space-y-1">
                       <button
-                        key={u.id}
+                        type="button"
                         onClick={() => {
-                          selectSpecificUser(u.id);
+                          setActiveView('perfil');
                           setShowRoleMenu(false);
                         }}
-                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
-                          u.id === currentUser.id
-                            ? 'bg-[#FFDDB9]/50 font-bold text-[#5A3900]'
-                            : 'hover:bg-stone-50 text-stone-700'
-                        }`}
-                        type="button"
+                        className="w-full flex items-center gap-2 p-2.5 rounded-xl text-left text-xs font-semibold hover:bg-stone-50 text-stone-700 transition-colors cursor-pointer"
                       >
-                        <div className="flex items-center gap-2">
-                          <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover" />
-                          <div className="truncate">
-                            <div className="truncate">{u.name}</div>
-                            <div className="text-[10px] text-stone-400 capitalize">{u.role}</div>
-                          </div>
-                        </div>
-                        {u.id === currentUser.id && (
-                          <span className="material-symbols-outlined text-[#835500] text-[18px]">
-                            check
-                          </span>
-                        )}
+                        <span className="material-symbols-outlined text-[#835500] text-[18px]">
+                          person
+                        </span>
+                        <span>Ver mi perfil</span>
                       </button>
-                    ))}
-                  </div>
 
-                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between px-2 text-xs">
-                    <button
-                      onClick={() => {
-                        onOpenAuth('login');
-                        setShowRoleMenu(false);
-                      }}
-                      className="text-[#835500] hover:text-[#5A3900] font-semibold cursor-pointer"
-                      type="button"
-                    >
-                      Autenticación
-                    </button>
-                    <button
-                      onClick={() => {
-                        logoutUser();
-                        setShowRoleMenu(false);
-                      }}
-                      className="text-[#AB3333] hover:text-[#801318] font-semibold flex items-center gap-1 cursor-pointer"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">logout</span>
-                      Salir
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          logoutUser();
+                          setShowRoleMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 p-2.5 rounded-xl text-left text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-rose-600 text-[18px]">
+                          logout
+                        </span>
+                        <span>Cerrar sesión</span>
+                      </button>
+                    </div>
+
+                    {/* Quick test seeder accounts */}
+                    <div className="pt-2 border-t border-stone-100">
+                      <span className="text-[10px] uppercase font-bold text-stone-400 px-2 block mb-1">
+                        Cuentas Rápidas (Seeder):
+                      </span>
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {allUsers.slice(0, 4).map((u) => (
+                          <button
+                            key={u.id}
+                            onClick={() => {
+                              selectSpecificUser(u.id);
+                              setShowRoleMenu(false);
+                            }}
+                            className={`w-full flex items-center justify-between p-1.5 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                              u.id === currentUser.id
+                                ? 'bg-[#FFDDB9]/50 font-bold text-[#5A3900]'
+                                : 'hover:bg-stone-50 text-stone-700'
+                            }`}
+                            type="button"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <img src={u.avatar} alt={u.name} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                              <div className="truncate text-[11px]">{u.name}</div>
+                            </div>
+                            <span className="text-[9px] text-stone-400 uppercase shrink-0">{u.role}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
         </div>

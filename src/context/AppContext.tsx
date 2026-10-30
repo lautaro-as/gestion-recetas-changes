@@ -30,12 +30,24 @@ import { downloadWeeklyPlannerPdf, downloadRecipePackagePdf } from '../utils/wee
 
 interface AppContextType {
   // Authentication & Users
+  isAuthenticated: boolean;
+  setIsAuthenticated: (val: boolean) => void;
   currentUser: UserProfile;
   allUsers: UserProfile[];
   switchUserRole: (role: UserRole) => void;
   selectSpecificUser: (userId: string) => void;
   loginUser: (email: string) => boolean;
+  loginUserWithPassword: (email: string, password: string, remember30Days?: boolean) => { success: boolean; message: string };
+  quickLoginAsUser: (userId: string, remember30Days?: boolean) => void;
   registerUser: (name: string, email: string, role: UserRole) => void;
+  registerNewUser: (params: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    gender: string;
+    password: string;
+  }) => { success: boolean; message: string };
+  updateUserRole: (userId: string, newRole: UserRole) => void;
   logoutUser: () => void;
   updateUserProfile: (data: Partial<UserProfile>) => void;
   addSubProfile: (name: string, relation: string, dietaryRestrictions: DietaryTag[]) => void;
@@ -123,6 +135,8 @@ const AppContext = createContext<AppContextType | null>(null);
 const STORAGE_KEYS = {
   USERS: 'gusto_users_v1',
   CURRENT_USER_ID: 'gusto_current_user_id_v1',
+  REMEMBER_EXPIRES: 'gusto_remember_expires_v1',
+  IS_LOGGED_OUT: 'gusto_is_logged_out_v1',
   RECIPES: 'gusto_recipes_v1',
   COMMENTS: 'gusto_comments_v1',
   CART: 'gusto_cart_v1',
@@ -140,8 +154,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_USERS;
   });
 
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const explicitlyLoggedOut = localStorage.getItem(STORAGE_KEYS.IS_LOGGED_OUT) === 'true';
+    if (explicitlyLoggedOut) return false;
+
+    const savedId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+    if (!savedId) return false;
+
+    const expiresStr = localStorage.getItem(STORAGE_KEYS.REMEMBER_EXPIRES);
+    if (expiresStr) {
+      const exp = parseInt(expiresStr, 10);
+      if (Date.now() > exp) {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+        localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
+        return false;
+      }
+    }
+    return true;
+  });
+
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+    const explicitlyLoggedOut = localStorage.getItem(STORAGE_KEYS.IS_LOGGED_OUT) === 'true';
+    if (explicitlyLoggedOut) return '';
+
+    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
     return saved || 'user-mateo';
   });
 
@@ -333,6 +369,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetUser = users.find(u => u.role === role);
     if (targetUser) {
       setCurrentUserId(targetUser.id);
+      setIsAuthenticated(true);
+      localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
       showToast(`Sesión cambiada a perfil: ${targetUser.name} (${targetUser.role.toUpperCase()})`);
     }
   };
@@ -341,30 +379,125 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const u = users.find(x => x.id === userId);
     if (u) {
       setCurrentUserId(u.id);
+      setIsAuthenticated(true);
+      localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
       showToast(`Sesión activa: ${u.name}`);
     }
   };
 
-  const loginUser = (email: string) => {
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (found) {
-      setCurrentUserId(found.id);
-      showToast(`¡Bienvenido de vuelta, ${found.name}!`);
-      return true;
+  // 1-Click login for preloaded seeder accounts without password
+  const quickLoginAsUser = (userId: string, remember30Days = true) => {
+    const target = users.find(u => u.id === userId);
+    if (target) {
+      setCurrentUserId(target.id);
+      setIsAuthenticated(true);
+      localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
+
+      if (remember30Days) {
+        const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, target.id);
+        localStorage.setItem(STORAGE_KEYS.REMEMBER_EXPIRES, expiresAt.toString());
+      } else {
+        sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, target.id);
+        localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+      }
+      showToast(`¡Sesión iniciada con cuenta predeterminada: ${target.name}!`);
     }
-    showToast('Correo no encontrado. Puedes registrarte en la pestaña Registro.');
-    return false;
   };
 
-  const registerUser = (name: string, email: string, role: UserRole) => {
+  // Login with email and password with optional 30-day device remember
+  const loginUserWithPassword = (
+    email: string,
+    password: string,
+    remember30Days = false
+  ): { success: boolean; message: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    const found = users.find(u => u.email.toLowerCase() === cleanEmail);
+
+    if (!found) {
+      return {
+        success: false,
+        message: 'No existe ninguna cuenta registrada con este correo electrónico.'
+      };
+    }
+
+    if (found.password && found.password !== password) {
+      return {
+        success: false,
+        message: 'La contraseña ingresada no es válida. Por favor verifica tus credenciales.'
+      };
+    }
+
+    setCurrentUserId(found.id);
+    setIsAuthenticated(true);
+    localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
+
+    if (remember30Days) {
+      const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, found.id);
+      localStorage.setItem(STORAGE_KEYS.REMEMBER_EXPIRES, expiresAt.toString());
+    } else {
+      sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, found.id);
+      localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    }
+
+    showToast(`¡Bienvenido de vuelta, ${found.name}!`);
+    return { success: true, message: `Sesión iniciada como ${found.name}` };
+  };
+
+  const loginUser = (email: string) => {
+    const res = loginUserWithPassword(email, 'password123', true);
+    return res.success;
+  };
+
+  // Register new user with firstName, lastName, email, gender, password and default role 'usuario'
+  const registerNewUser = (params: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    gender: string;
+    password: string;
+  }): { success: boolean; message: string } => {
+    const cleanEmail = params.email.trim().toLowerCase();
+    const cleanFirst = params.firstName.trim();
+    const cleanLast = params.lastName.trim();
+
+    if (!cleanFirst || !cleanLast || !cleanEmail || !params.password) {
+      return { success: false, message: 'Por favor completa todos los campos requeridos.' };
+    }
+
+    const emailExists = users.some(u => u.email.toLowerCase() === cleanEmail);
+    if (emailExists) {
+      return {
+        success: false,
+        message: 'Ya existe una cuenta registrada con este correo electrónico. Por favor inicia sesión.'
+      };
+    }
+
+    const fullName = `${cleanFirst} ${cleanLast}`;
+    const cleanUsername = `${cleanFirst.toLowerCase().replace(/[^a-z0-9]/g, '')}_${cleanLast.toLowerCase().replace(/[^a-z0-9]/g, '')}` || `usuario_${Date.now()}`;
+
+    // Personalized avatar based on gender selection
+    const avatar = params.gender === 'Femenino'
+      ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&auto=format&fit=crop&q=80'
+      : params.gender === 'Masculino'
+      ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80'
+      : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80';
+
     const newUser: UserProfile = {
       id: `user-${Date.now()}`,
-      name,
-      username: name.toLowerCase().replace(/\s+/g, '_'),
-      email,
-      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80`,
-      role,
-      bio: 'Cocinero entusiasta y miembro de la comunidad Gusto.',
+      name: fullName,
+      firstName: cleanFirst,
+      lastName: cleanLast,
+      gender: params.gender,
+      username: cleanUsername,
+      email: cleanEmail,
+      password: params.password,
+      avatar,
+      role: 'usuario', // Rol asignado por defecto: usuario
+      bio: 'Nuevo aficionado a la cocina y miembro activo de la comunidad Gusto.',
       specialties: ['Cocina Casera'],
       dietaryPreferences: [],
       subprofiles: [],
@@ -372,15 +505,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       followingUserIds: ['user-mateo', 'user-lucia'],
       wishlistRecipeIds: [],
     };
+
     setUsers(prev => [...prev, newUser]);
     setCurrentUserId(newUser.id);
-    showToast(`¡Cuenta creada con éxito! Bienvenido ${name}.`);
+    setIsAuthenticated(true);
+    localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
+    sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUser.id);
+
+    showToast(`¡Cuenta creada con éxito! Bienvenido a Gusto, ${cleanFirst} (Rol: Usuario).`);
+    return { success: true, message: 'Usuario registrado con éxito.' };
   };
 
+  const registerUser = (name: string, email: string, role: UserRole) => {
+    const parts = name.trim().split(' ');
+    const firstName = parts[0] || 'Usuario';
+    const lastName = parts.slice(1).join(' ') || 'Gusto';
+    registerNewUser({
+      firstName,
+      lastName,
+      email,
+      gender: 'Prefiero no decirlo',
+      password: 'password123'
+    });
+    if (role !== 'usuario') {
+      updateUserRole(currentUserId, role);
+    }
+  };
+
+  // Moderator / Admin role assignment
+  const updateUserRole = (userId: string, newRole: UserRole) => {
+    setUsers(prev => prev.map(u => (u.id === userId ? { ...u, role: newRole } : u)));
+    const targetUser = users.find(u => u.id === userId);
+    showToast(`Rol de ${targetUser?.name || 'usuario'} actualizado a ${newRole.toUpperCase()}.`);
+  };
+
+  // Logout clears session, flags explicitly logged out, and redirects to auth landing page
   const logoutUser = () => {
-    showToast('Sesión cerrada correctamente.');
-    // switch to first guest/standard
-    setCurrentUserId('user-camila');
+    setIsAuthenticated(false);
+    setCurrentUserId('');
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    localStorage.setItem(STORAGE_KEYS.IS_LOGGED_OUT, 'true');
+    showToast('Sesión cerrada correctamente. Hasta pronto.');
   };
 
   const updateUserProfile = (data: Partial<UserProfile>) => {
@@ -1298,12 +1465,18 @@ Gusto - Sistema de Gestión de Recetas.
   return (
     <AppContext.Provider
       value={{
+        isAuthenticated,
+        setIsAuthenticated,
         currentUser,
         allUsers: users,
         switchUserRole,
         selectSpecificUser,
         loginUser,
+        loginUserWithPassword,
+        quickLoginAsUser,
         registerUser,
+        registerNewUser,
+        updateUserRole,
         logoutUser,
         updateUserProfile,
         addSubProfile,

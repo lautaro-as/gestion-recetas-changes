@@ -41,6 +41,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     selectSpecificUser,
     publishScheduledNow,
     togglePinRecipe,
+    logoutUser,
     showToast,
   } = useApp();
 
@@ -257,14 +258,26 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 
           {/* Right: Actions Cluster & Subprofile switcher */}
           <div className="flex flex-col gap-2.5 w-full lg:w-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsEditingProfile(!isEditingProfile)}
-              className="inline-flex items-center justify-center gap-2 bg-[#E09F3E] hover:bg-[#835500] text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-full shadow-[0_4px_14px_rgba(224,159,62,0.35)] transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
-              <span>Editar perfil</span>
-            </button>
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditingProfile(!isEditingProfile)}
+                className="inline-flex items-center justify-center gap-2 bg-[#E09F3E] hover:bg-[#835500] text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-full shadow-[0_4px_14px_rgba(224,159,62,0.35)] transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+                <span>Editar perfil</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={logoutUser}
+                className="inline-flex items-center justify-center gap-2 bg-stone-100 hover:bg-rose-50 text-stone-700 hover:text-rose-700 border border-stone-200 hover:border-rose-200 text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-full transition-all cursor-pointer"
+                title="Cerrar sesión y volver a la página principal"
+              >
+                <span className="material-symbols-outlined text-[18px] text-rose-600">logout</span>
+                <span>Cerrar sesión</span>
+              </button>
+            </div>
 
             {/* Subprofiles dropdown button */}
             <div className="bg-[#F6F3F2] p-3 rounded-2xl border border-stone-200/60 space-y-2 text-xs">

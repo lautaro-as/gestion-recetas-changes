@@ -19,6 +19,7 @@ import { UserProfileView } from './components/UserProfileView';
 import { ModerationAdminPanel } from './components/ModerationAdminPanel';
 import { PrintRecipeView } from './components/PrintRecipeView';
 import { AuthModals } from './components/AuthModals';
+import { AuthLandingView } from './components/AuthLandingView';
 import { ReportModal } from './components/ReportModal';
 import { PublicProfileModal } from './components/PublicProfileModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -44,6 +45,7 @@ function AppContent() {
   const {
     recipes,
     currentUser,
+    isAuthenticated,
     allUsers,
     selectSpecificUser,
     followUserToggle,
@@ -56,6 +58,14 @@ function AppContent() {
 
   // Navigation view: 'explorar' | 'destacadas' | 'foro' | 'comparar' | 'perfil' | 'moderacion'
   const [activeView, setActiveView] = useState<string>('explorar');
+  const [isBrowsingAsGuest, setIsBrowsingAsGuest] = useState(false);
+
+  // When logged out, reset guest browsing state
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setIsBrowsingAsGuest(false);
+    }
+  }, [isAuthenticated]);
 
   // RF-16: Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -225,6 +235,24 @@ function AppContent() {
     );
   }
 
+  // Gateway: If not authenticated and not browsing as guest, show the Login/Register Page!
+  if (!isAuthenticated && !isBrowsingAsGuest) {
+    return (
+      <>
+        <AuthLandingView
+          initialTab={authInitialMode}
+          onBrowseAsGuest={() => setIsBrowsingAsGuest(true)}
+        />
+        {toast && (
+          <div className="fixed bottom-6 right-6 z-50 max-w-md bg-stone-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-stone-700 text-xs sm:text-sm font-medium flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <CheckCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>{toast}</span>
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F3F3F3] text-[#333333] flex flex-col justify-between">
       <Navbar
@@ -234,7 +262,11 @@ function AppContent() {
         onOpenCart={() => setIsCartOpen(true)}
         onOpenAuth={(mode) => {
           setAuthInitialMode(mode || 'login');
-          setIsAuthOpen(true);
+          if (!isAuthenticated) {
+            setIsBrowsingAsGuest(false);
+          } else {
+            setIsAuthOpen(true);
+          }
         }}
         onSelectRecipeById={(recipeId) => {
           const found = recipes.find((r) => r.id === recipeId);

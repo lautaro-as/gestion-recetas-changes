@@ -20,6 +20,9 @@ export interface SubProfile {
 export interface UserProfile {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: string;
   username: string;
   email: string;
   password?: string;
