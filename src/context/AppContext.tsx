@@ -117,6 +117,9 @@ interface AppContextType {
   // Print & Export
   printableRecipe: Recipe | null;
   setPrintableRecipe: (recipe: Recipe | null) => void;
+  recipeToConfirmDownload: Recipe | null;
+  setRecipeToConfirmDownload: (recipe: Recipe | null) => void;
+  executeDownloadRecipePdf: (recipeOverride?: Recipe) => void;
   exportRecipePdf: (recipe: Recipe) => void;
   exportRecipeJson: (recipe: Recipe) => void;
   exportRecipeText: (recipe: Recipe) => void;
@@ -264,6 +267,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [comparingRecipeIds, setComparingRecipeIds] = useState<string[]>([]);
   const [selectedStoreFilter, setSelectedStoreFilter] = useState<string>('Todas');
   const [printableRecipe, setPrintableRecipe] = useState<Recipe | null>(null);
+  const [recipeToConfirmDownload, setRecipeToConfirmDownload] = useState<Recipe | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Sync to local storage
@@ -479,12 +483,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const fullName = `${cleanFirst} ${cleanLast}`;
     const cleanUsername = `${cleanFirst.toLowerCase().replace(/[^a-z0-9]/g, '')}_${cleanLast.toLowerCase().replace(/[^a-z0-9]/g, '')}` || `usuario_${Date.now()}`;
 
-    // Personalized avatar based on gender selection
-    const avatar = params.gender === 'Femenino'
-      ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&auto=format&fit=crop&q=80'
-      : params.gender === 'Masculino'
-      ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80'
-      : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80';
+    // Default avatar image uploaded by user
+    const avatar = '/assets/aistudio/default_avatar_b96d7689.jpg';
 
     const newUser: UserProfile = {
       id: `user-${Date.now()}`,
@@ -1343,12 +1343,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Exporting & Printing
   const exportRecipePdf = (recipe: Recipe) => {
+    // Prompt confirmation dialog before downloading
+    setRecipeToConfirmDownload(recipe);
+  };
+
+  const executeDownloadRecipePdf = (recipeOverride?: Recipe) => {
+    const target = recipeOverride || recipeToConfirmDownload;
+    if (!target) return;
     try {
-      downloadRecipePdf(recipe);
-      showToast(`Receta "${recipe.title}" descargada en formato PDF.`);
+      downloadRecipePdf(target);
+      showToast(`Receta "${target.title}" descargada en formato PDF.`);
     } catch (err) {
       console.error('Error al generar PDF:', err);
       showToast('Error al generar el PDF de la receta.');
+    } finally {
+      setRecipeToConfirmDownload(null);
     }
   };
 
@@ -1537,6 +1546,9 @@ Gusto - Sistema de Gestión de Recetas.
 
         printableRecipe,
         setPrintableRecipe,
+        recipeToConfirmDownload,
+        setRecipeToConfirmDownload,
+        executeDownloadRecipePdf,
         exportRecipePdf,
         exportRecipeJson,
         exportRecipeText,

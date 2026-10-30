@@ -20,6 +20,7 @@ import { ModerationAdminPanel } from './components/ModerationAdminPanel';
 import { PrintRecipeView } from './components/PrintRecipeView';
 import { AuthModals } from './components/AuthModals';
 import { AuthLandingView } from './components/AuthLandingView';
+import { ConfirmDownloadRecipeModal } from './components/ConfirmDownloadRecipeModal';
 import { ReportModal } from './components/ReportModal';
 import { PublicProfileModal } from './components/PublicProfileModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -51,6 +52,9 @@ function AppContent() {
     followUserToggle,
     printableRecipe,
     setPrintableRecipe,
+    recipeToConfirmDownload,
+    setRecipeToConfirmDownload,
+    executeDownloadRecipePdf,
     toast,
   } = useApp();
 
@@ -651,6 +655,13 @@ function AppContent() {
         targetType={reportTarget.type}
         targetId={reportTarget.id}
         targetTitle={reportTarget.title}
+      />
+
+      <ConfirmDownloadRecipeModal
+        isOpen={!!recipeToConfirmDownload}
+        recipe={recipeToConfirmDownload}
+        onConfirm={() => executeDownloadRecipePdf()}
+        onCancel={() => setRecipeToConfirmDownload(null)}
       />
 
       {/* Toast Notification Popup */}

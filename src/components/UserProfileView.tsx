@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Recipe, UserProfile, DietaryTag, SubProfile } from '../types';
 import { RecipeCard } from './RecipeCard';
 import { ScrollableFilterBar } from './ScrollableFilterBar';
 import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Camera, Upload } from 'lucide-react';
 
 interface UserProfileViewProps {
   onOpenDetail: (recipe: Recipe) => void;
@@ -52,10 +52,41 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
 
+  // Avatar upload and edit state
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Edit profile state
   const [name, setName] = useState(currentUser.name);
   const [bio, setBio] = useState(currentUser.bio);
   const [specialtiesText, setSpecialtiesText] = useState(currentUser.specialties.join(', '));
+
+  // Trigger file explorer when avatar is clicked
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Process chosen device image
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Por favor selecciona un archivo de imagen válido.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setAvatarPreview(dataUrl);
+        setIsEditingProfile(true);
+        showToast('Imagen seleccionada. Presiona "Guardar cambios" para actualizar tu foto de perfil.');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Add subprofile state
   const [showAddSubProfile, setShowAddSubProfile] = useState(false);
@@ -104,11 +135,13 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     updateUserProfile({
       name,
       bio,
+      avatar: avatarPreview || currentUser.avatar,
       specialties: specialtiesText
         .split(',')
         .map((s) => s.trim())
         .filter((s) => s.length > 0),
     });
+    setAvatarPreview(null);
     setIsEditingProfile(false);
     showToast('Perfil actualizado correctamente');
   };
@@ -149,17 +182,37 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         <div className="flex flex-col lg:flex-row items-start justify-between gap-6 relative z-10">
           {/* Left: Avatar & Bio details */}
           <div className="flex flex-col md:flex-row items-start gap-6 max-w-4xl">
-            {/* Chef Portrait with Verified Cloche Badge */}
+            {/* Chef Portrait with Camera Hover & Cloche Badge */}
             <div className="relative shrink-0">
-              <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden shadow-[0_8px_24px_rgba(131,85,0,0.18)] ring-4 ring-[#E09F3E]/20">
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFileChange}
+              />
               <div
-                className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-[#E09F3E] text-white flex items-center justify-center shadow-md"
+                onClick={handleAvatarClick}
+                className="relative w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden shadow-[0_8px_24px_rgba(131,85,0,0.18)] ring-4 ring-[#E09F3E]/20 group cursor-pointer"
+                title="Haz clic para subir una foto desde tu dispositivo"
+              >
+                <img
+                  src={avatarPreview || currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+
+                {/* Dark overlay & Camera Icon on hover */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-white">
+                  <Camera className="w-8 h-8 text-white drop-shadow-md" />
+                  <span className="text-[10px] font-bold mt-1 text-amber-100 text-center px-1">
+                    Cambiar foto
+                  </span>
+                </div>
+              </div>
+
+              <div
+                className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-[#E09F3E] text-white flex items-center justify-center shadow-md pointer-events-none"
                 title="Chef Verificado"
               >
                 <span
@@ -333,6 +386,23 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         {isEditingProfile && (
           <form onSubmit={handleProfileSave} className="mt-6 pt-6 border-t border-stone-100 space-y-4">
             <h3 className="font-bold text-sm text-[#1B1C1C]">Editar Datos Personales</h3>
+
+            {avatarPreview && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 font-medium">
+                  <Camera className="w-4 h-4 text-[#835500] shrink-0" />
+                  <span>Nueva foto de perfil seleccionada desde tu dispositivo (se aplicará al guardar).</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAvatarPreview(null)}
+                  className="text-xs text-rose-600 hover:underline font-bold shrink-0 cursor-pointer"
+                >
+                  Descartar foto
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1">Nombre Completo</label>
@@ -366,14 +436,17 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setIsEditingProfile(false)}
-                className="px-4 py-1.5 rounded-full text-xs font-semibold text-stone-600 hover:bg-stone-100"
+                onClick={() => {
+                  setIsEditingProfile(false);
+                  setAvatarPreview(null);
+                }}
+                className="px-4 py-1.5 rounded-full text-xs font-semibold text-stone-600 hover:bg-stone-100 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-5 py-1.5 rounded-full bg-[#E09F3E] hover:bg-[#835500] text-white text-xs font-bold shadow-sm"
+                className="px-5 py-1.5 rounded-full bg-[#E09F3E] hover:bg-[#835500] text-white text-xs font-bold shadow-sm cursor-pointer"
               >
                 Guardar cambios
               </button>

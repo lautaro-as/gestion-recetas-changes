@@ -7,6 +7,7 @@ import {
   UserCheck,
   UserPlus,
   AlertTriangle,
+  Flag,
   MapPin,
   Sparkles,
   BookOpen,
@@ -92,7 +93,7 @@ export const PublicProfileModal: React.FC<PublicProfileModalProps> = ({
                 title="Denunciar este perfil"
                 className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
               >
-                <AlertTriangle className="w-4 h-4" />
+                <Flag className="w-4 h-4" />
               </button>
             )}
 
