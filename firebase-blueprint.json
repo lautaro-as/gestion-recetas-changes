@@ -1,0 +1,221 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Perfil de usuario registrado en la plataforma Gusto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "firstName": { "type": "string", "maxLength": 50 },
+        "lastName": { "type": "string", "maxLength": 50 },
+        "gender": { "type": "string", "maxLength": 20 },
+        "username": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "format": "email", "maxLength": 150 },
+        "avatar": { "type": "string", "maxLength": 1000 },
+        "role": { "type": "string", "enum": ["usuario", "premium", "editor", "admin"] },
+        "bio": { "type": "string", "maxLength": 1000 },
+        "specialties": { "type": "array" },
+        "dietaryPreferences": { "type": "array" },
+        "subprofiles": { "type": "array" },
+        "followersCount": { "type": "number" },
+        "followingUserIds": { "type": "array" },
+        "pinnedRecipeId": { "type": "string", "maxLength": 128 },
+        "wishlistRecipeIds": { "type": "array" },
+        "location": { "type": "string", "maxLength": 100 },
+        "isBanned": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "username", "email", "role"]
+    },
+    "Recipe": {
+      "title": "Recipe",
+      "description": "Receta gastronómica publicada o programada en Gusto",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 3000 },
+        "coverImage": { "type": "string", "maxLength": 1000 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 100 },
+        "authorAvatar": { "type": "string", "maxLength": 1000 },
+        "coAuthors": { "type": "array" },
+        "status": { "type": "string", "enum": ["published", "draft", "scheduled", "archived"] },
+        "scheduledPublishDate": { "type": "string" },
+        "prepTimeMin": { "type": "number" },
+        "cookTimeMin": { "type": "number" },
+        "servings": { "type": "number" },
+        "difficulty": { "type": "string", "enum": ["facil", "media", "dificil"] },
+        "category": { "type": "string", "maxLength": 50 },
+        "tags": { "type": "array" },
+        "ingredients": { "type": "array" },
+        "steps": { "type": "array" },
+        "videoUrl": { "type": "string", "maxLength": 1000 },
+        "nutrition": { "type": "object" },
+        "likesCount": { "type": "number" },
+        "dislikesCount": { "type": "number" },
+        "likedUserIds": { "type": "array" },
+        "dislikedUserIds": { "type": "array" },
+        "commentsCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "authorId", "status", "category"]
+    },
+    "RecipeComment": {
+      "title": "RecipeComment",
+      "description": "Comentario o valoración sobre una receta",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "recipeId": { "type": "string", "maxLength": 128 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 100 },
+        "authorAvatar": { "type": "string", "maxLength": 1000 },
+        "content": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "dislikesCount": { "type": "number" },
+        "likedUserIds": { "type": "array" },
+        "dislikedUserIds": { "type": "array" },
+        "parentCommentId": { "type": "string", "maxLength": 128 },
+        "isPinned": { "type": "boolean" },
+        "repliesCount": { "type": "number" }
+      },
+      "required": ["id", "recipeId", "authorId", "content"]
+    },
+    "ForumTopic": {
+      "title": "ForumTopic",
+      "description": "Tema o debate abierto en el foro comunitario",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 100 },
+        "authorAvatar": { "type": "string", "maxLength": 1000 },
+        "authorRole": { "type": "string", "enum": ["usuario", "premium", "editor", "admin"] },
+        "category": { "type": "string", "maxLength": 50 },
+        "tags": { "type": "array" },
+        "isPinned": { "type": "boolean" },
+        "isLocked": { "type": "boolean" },
+        "viewsCount": { "type": "number" },
+        "repliesCount": { "type": "number" },
+        "likesCount": { "type": "number" },
+        "likedUserIds": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "lastActivityAt": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "authorId", "category"]
+    },
+    "ForumReply": {
+      "title": "ForumReply",
+      "description": "Respuesta o intervención en un tema del foro",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "topicId": { "type": "string", "maxLength": 128 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 100 },
+        "authorAvatar": { "type": "string", "maxLength": 1000 },
+        "authorRole": { "type": "string", "enum": ["usuario", "premium", "editor", "admin"] },
+        "content": { "type": "string", "maxLength": 3000 },
+        "likesCount": { "type": "number" },
+        "likedUserIds": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "isModerated": { "type": "boolean" }
+      },
+      "required": ["id", "topicId", "authorId", "content"]
+    },
+    "ModerationReport": {
+      "title": "ModerationReport",
+      "description": "Reporte de moderación emitido por un usuario",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "targetType": { "type": "string", "enum": ["recipe", "profile"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "titleOrName": { "type": "string", "maxLength": 200 },
+        "reporterId": { "type": "string", "maxLength": 128 },
+        "reporterName": { "type": "string", "maxLength": 100 },
+        "reason": { "type": "string", "maxLength": 100 },
+        "details": { "type": "string", "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "resolved"] },
+        "resolution": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" },
+        "resolvedAt": { "type": "string" }
+      },
+      "required": ["id", "targetType", "targetId", "reporterId", "reason"]
+    },
+    "RecipeCollection": {
+      "title": "RecipeCollection",
+      "description": "Colección temática de recetas creada por un usuario",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "recipeIds": { "type": "array" },
+        "isPrivate": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Notificación para un usuario de la plataforma",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "message": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "maxLength": 50 },
+        "linkTarget": { "type": "string", "maxLength": 200 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "message"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Colección de perfiles de usuario"
+    },
+    "/recipes/{recipeId}": {
+      "schema": { "$ref": "#/entities/Recipe" },
+      "description": "Colección de recetas culinarias y planificaciones"
+    },
+    "/recipe_comments/{commentId}": {
+      "schema": { "$ref": "#/entities/RecipeComment" },
+      "description": "Colección de valoraciones y comentarios de recetas"
+    },
+    "/forum_topics/{topicId}": {
+      "schema": { "$ref": "#/entities/ForumTopic" },
+      "description": "Colección de hilos y debates del foro comunitario"
+    },
+    "/forum_replies/{replyId}": {
+      "schema": { "$ref": "#/entities/ForumReply" },
+      "description": "Colección de respuestas a debates del foro"
+    },
+    "/moderation_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/ModerationReport" },
+      "description": "Colección de reportes de moderación para administradores"
+    },
+    "/recipe_collections/{collectionId}": {
+      "schema": { "$ref": "#/entities/RecipeCollection" },
+      "description": "Colección de libros y selecciones de recetas personales"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "Colección de notificaciones para usuarios"
+    }
+  }
+}

@@ -27,6 +27,17 @@ import {
 } from '../data/seedData';
 import { downloadRecipePdf } from '../utils/recipePdfGenerator';
 import { downloadWeeklyPlannerPdf, downloadRecipePackagePdf } from '../utils/weeklyPlannerPdfGenerator';
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  onSnapshot
+} from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { db, auth, googleProvider, testConnection } from '../firebase/config';
+import { handleFirestoreError, OperationType } from '../firebase/firestoreErrors';
 
 interface AppContextType {
   // Authentication & Users
@@ -39,6 +50,7 @@ interface AppContextType {
   loginUser: (email: string) => boolean;
   loginUserWithPassword: (email: string, password: string, remember30Days?: boolean) => { success: boolean; message: string };
   quickLoginAsUser: (userId: string, remember30Days?: boolean) => void;
+  loginWithGoogle: () => Promise<boolean>;
   registerUser: (name: string, email: string, role: UserRole) => void;
   registerNewUser: (params: {
     firstName: string;
@@ -131,176 +143,60 @@ interface AppContextType {
   // Toast System
   toast: string | null;
   showToast: (msg: string) => void;
+
+  // Firebase status
+  isFirebaseReady: boolean;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
 
 const STORAGE_KEYS = {
-  USERS: 'gusto_users_v1',
   CURRENT_USER_ID: 'gusto_current_user_id_v1',
   REMEMBER_EXPIRES: 'gusto_remember_expires_v1',
   IS_LOGGED_OUT: 'gusto_is_logged_out_v1',
-  RECIPES: 'gusto_recipes_v1',
-  COMMENTS: 'gusto_comments_v1',
   CART: 'gusto_cart_v1',
-  REPORTS: 'gusto_reports_v1',
-  COLLECTIONS: 'gusto_collections_v1',
-  TOPICS: 'gusto_topics_v1',
-  REPLIES: 'gusto_replies_v1',
-  NOTIFICATIONS: 'gusto_notifications_v1',
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load state from localStorage or fallback to Seed Data
-  const [users, setUsers] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USERS);
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
-  });
+  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
 
+  // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const explicitlyLoggedOut = localStorage.getItem(STORAGE_KEYS.IS_LOGGED_OUT) === 'true';
     if (explicitlyLoggedOut) return false;
 
-    const savedId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    if (!savedId) return false;
-
-    const expiresStr = localStorage.getItem(STORAGE_KEYS.REMEMBER_EXPIRES);
-    if (expiresStr) {
-      const exp = parseInt(expiresStr, 10);
-      if (Date.now() > exp) {
+    const rememberExpires = localStorage.getItem(STORAGE_KEYS.REMEMBER_EXPIRES);
+    if (rememberExpires) {
+      const expiresAt = parseInt(rememberExpires, 10);
+      if (Date.now() > expiresAt) {
         localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
         localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
         return false;
       }
     }
-    return true;
+
+    const savedUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+    return Boolean(savedUserId);
   });
 
+  const [users, setUsers] = useState<UserProfile[]>(INITIAL_USERS);
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
     const explicitlyLoggedOut = localStorage.getItem(STORAGE_KEYS.IS_LOGGED_OUT) === 'true';
     if (explicitlyLoggedOut) return '';
-
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    return saved || 'user-mateo';
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || 'user-mateo';
   });
 
-  const normalizeStoreName = (store?: string) => {
-    if (!store) return 'Coto Digital';
-    if (store.includes('Gourmet') || store.includes('Central Gourmet') || store.includes('San Jorge')) return 'Coto Digital';
-    if (store.includes('Trébol') || store.includes('Dietética')) return 'Jumbo Hipermercado';
-    if (store.includes('Orgánico') || store.includes('Fresco')) return 'Mercado Central';
-    if (store.includes('Trigal')) return 'Carrefour Market';
-    return store;
-  };
-
-  const normalizePrice = (price?: number) => {
-    if (typeof price !== 'number' || isNaN(price)) return 1500;
-    if (price > 0 && price < 100) {
-      return Math.round(price * 1200);
-    }
-    return price;
-  };
-
-  const [recipes, setRecipes] = useState<Recipe[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.RECIPES);
-    if (!saved) return INITIAL_RECIPES;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_RECIPES;
-      return parsed.map((rec: Recipe) => ({
-        ...rec,
-        ingredients: (rec.ingredients || []).map((ing) => ({
-          ...ing,
-          storeName: normalizeStoreName(ing.storeName),
-          estimatedPrice: normalizePrice(ing.estimatedPrice),
-        })),
-      }));
-    } catch {
-      return INITIAL_RECIPES;
-    }
-  });
-
-  const [comments, setComments] = useState<RecipeComment[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.COMMENTS);
-    if (!saved) return INITIAL_COMMENTS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_COMMENTS;
-      return parsed.map((c: RecipeComment) => ({
-        ...c,
-        baseLikes: c.baseLikes ?? c.likes ?? 0,
-        baseDislikes: c.baseDislikes ?? 0,
-        likedUserIds: c.likedUserIds || [],
-        dislikedUserIds: c.dislikedUserIds || []
-      }));
-    } catch {
-      return INITIAL_COMMENTS;
-    }
-  });
+  const [recipes, setRecipes] = useState<Recipe[]>(INITIAL_RECIPES);
+  const [comments, setComments] = useState<RecipeComment[]>(INITIAL_COMMENTS);
+  const [forumTopics, setForumTopics] = useState<ForumTopic[]>(INITIAL_FORUM_TOPICS);
+  const [forumReplies, setForumReplies] = useState<ForumReply[]>(INITIAL_FORUM_REPLIES);
+  const [reports, setReports] = useState<ModerationReport[]>(INITIAL_REPORTS);
+  const [collections, setCollections] = useState<RecipeCollection[]>(INITIAL_COLLECTIONS);
+  const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CART);
-    if (!saved) return [];
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.map((item: CartItem) => ({
-        ...item,
-        storeName: normalizeStoreName(item.storeName || item.ingredient?.storeName),
-        ingredient: {
-          ...item.ingredient,
-          storeName: normalizeStoreName(item.ingredient?.storeName),
-          estimatedPrice: normalizePrice(item.ingredient?.estimatedPrice),
-        },
-      }));
-    } catch {
-      return [];
-    }
-  });
-
-  const [reports, setReports] = useState<ModerationReport[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.REPORTS);
-    if (!saved) return INITIAL_REPORTS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return INITIAL_REPORTS;
-      return parsed;
-    } catch {
-      return INITIAL_REPORTS;
-    }
-  });
-
-  const [collections, setCollections] = useState<RecipeCollection[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.COLLECTIONS);
-    return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
-  });
-
-  const [forumTopics, setForumTopics] = useState<ForumTopic[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TOPICS);
-    return saved ? JSON.parse(saved) : INITIAL_FORUM_TOPICS;
-  });
-
-  const [forumReplies, setForumReplies] = useState<ForumReply[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.REPLIES);
-    if (!saved) return INITIAL_FORUM_REPLIES;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_FORUM_REPLIES;
-      return parsed.map((r: ForumReply) => ({
-        ...r,
-        baseLikes: r.baseLikes ?? r.likesCount ?? 0,
-        baseDislikes: r.baseDislikes ?? 0,
-        likedUserIds: r.likedUserIds || [],
-        dislikedUserIds: r.dislikedUserIds || []
-      }));
-    } catch {
-      return INITIAL_FORUM_REPLIES;
-    }
-  });
-
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [comparingRecipeIds, setComparingRecipeIds] = useState<string[]>([]);
@@ -309,93 +205,188 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [recipeToConfirmDownload, setRecipeToConfirmDownload] = useState<Recipe | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Sync to local storage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
-  }, [currentUserId]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipes));
-  }, [recipes]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.COMMENTS, JSON.stringify(comments));
-  }, [comments]);
-
+  // Sync cart to local storage (cart is local to device/shopping trip)
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cart));
   }, [cart]);
 
+  // Sync current user ID
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
-  }, [reports]);
+    if (currentUserId) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    }
+  }, [currentUserId]);
 
+  // -------------------------------------------------------------
+  // FIREBASE INITIALIZATION & REAL-TIME SNAPSHOT LISTENERS
+  // -------------------------------------------------------------
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.COLLECTIONS, JSON.stringify(collections));
-  }, [collections]);
+    // 1. Mandatory test connection check as per Skill directive
+    testConnection();
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TOPICS, JSON.stringify(forumTopics));
-  }, [forumTopics]);
+    // 2. Auth State Observer
+    const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        setCurrentUserId(fbUser.uid);
+        setIsAuthenticated(true);
+        localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.REPLIES, JSON.stringify(forumReplies));
-  }, [forumReplies]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
-  }, [notifications]);
-
-  // Check scheduled recipes periodically and auto-publish when due
-  useEffect(() => {
-    const checkScheduled = () => {
-      const now = Date.now();
-      let hasChanges = false;
-      const publishedList: Recipe[] = [];
-
-      setRecipes(prev => {
-        const next = prev.map(r => {
-          if (
-            r.status === 'scheduled' &&
-            r.scheduledPublishDate &&
-            new Date(r.scheduledPublishDate).getTime() <= now
-          ) {
-            hasChanges = true;
-            const updated: Recipe = {
-              ...r,
-              status: 'published',
-              updatedAt: new Date().toISOString()
+        // Ensure user document exists in Firestore
+        try {
+          const userRef = doc(db, 'users', fbUser.uid);
+          const snap = await getDoc(userRef);
+          if (!snap.exists()) {
+            const isAdminEmail = fbUser.email === 'medilautaro06@gmail.com' || fbUser.email === 'admin@gusto.app';
+            const newProfile: UserProfile = {
+              id: fbUser.uid,
+              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cocinero Gusto',
+              firstName: fbUser.displayName?.split(' ')[0] || 'Cocinero',
+              lastName: fbUser.displayName?.split(' ').slice(1).join(' ') || '',
+              username: (fbUser.email?.split('@')[0] || 'usuario').replace(/[^a-zA-Z0-9_]/g, ''),
+              email: fbUser.email || '',
+              avatar: fbUser.photoURL || '/assets/aistudio/default_avatar_b96d7689.jpg',
+              role: isAdminEmail ? 'admin' : 'usuario',
+              bio: 'Miembro de la comunidad gastronómica Gusto.',
+              specialties: ['Cocina Casera'],
+              dietaryPreferences: [],
+              subprofiles: [],
+              followersCount: 0,
+              followingUserIds: ['user-mateo'],
+              wishlistRecipeIds: []
             };
-            publishedList.push(updated);
-            return updated;
+            await setDoc(userRef, newProfile);
           }
-          return r;
-        });
-        return hasChanges ? next : prev;
-      });
-
-      if (publishedList.length > 0) {
-        const newNotifs: AppNotification[] = publishedList.map(r => ({
-          id: `notif-sched-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          userId: r.authorId,
-          title: 'Receta programada publicada',
-          message: `Tu receta programada "${r.title}" ha sido publicada automáticamente en la comunidad.`,
-          createdAt: new Date().toISOString(),
-          read: false,
-          type: 'scheduled_published',
-          linkTarget: r.id
-        }));
-        setNotifications(prev => [...newNotifs, ...prev]);
+        } catch (err) {
+          console.warn('Error reading or setting user doc in Firestore:', err);
+        }
       }
-    };
+    });
 
-    checkScheduled();
-    const interval = setInterval(checkScheduled, 15000);
-    return () => clearInterval(interval);
+    // 3. Recipes Snapshot Listener
+    const unsubRecipes = onSnapshot(collection(db, 'recipes'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as Recipe);
+        setRecipes(list);
+      } else {
+        // Initial seeding if empty
+        INITIAL_RECIPES.forEach(rec => {
+          setDoc(doc(db, 'recipes', rec.id), rec).catch(e => console.warn('Recipe seeding:', e));
+        });
+      }
+      setIsFirebaseReady(true);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'recipes');
+    });
+
+    // 4. Users Snapshot Listener
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as UserProfile);
+        setUsers(list);
+      } else {
+        INITIAL_USERS.forEach(u => {
+          setDoc(doc(db, 'users', u.id), u).catch(e => console.warn('User seeding:', e));
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'users');
+    });
+
+    // 5. Comments Snapshot Listener
+    const unsubComments = onSnapshot(collection(db, 'recipe_comments'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as RecipeComment);
+        setComments(list);
+      } else {
+        INITIAL_COMMENTS.forEach(c => {
+          setDoc(doc(db, 'recipe_comments', c.id), c).catch(e => console.warn('Comment seeding:', e));
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'recipe_comments');
+    });
+
+    // 6. Forum Topics Snapshot Listener
+    const unsubTopics = onSnapshot(collection(db, 'forum_topics'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as ForumTopic);
+        setForumTopics(list);
+      } else {
+        INITIAL_FORUM_TOPICS.forEach(t => {
+          setDoc(doc(db, 'forum_topics', t.id), t).catch(e => console.warn('Topic seeding:', e));
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'forum_topics');
+    });
+
+    // 7. Forum Replies Snapshot Listener
+    const unsubReplies = onSnapshot(collection(db, 'forum_replies'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as ForumReply);
+        setForumReplies(list);
+      } else {
+        INITIAL_FORUM_REPLIES.forEach(r => {
+          setDoc(doc(db, 'forum_replies', r.id), r).catch(e => console.warn('Reply seeding:', e));
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'forum_replies');
+    });
+
+    // 8. Moderation Reports Snapshot Listener
+    const unsubReports = onSnapshot(collection(db, 'moderation_reports'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as ModerationReport);
+        setReports(list);
+      } else {
+        INITIAL_REPORTS.forEach(rep => {
+          setDoc(doc(db, 'moderation_reports', rep.id), rep).catch(e => console.warn('Report seeding:', e));
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'moderation_reports');
+    });
+
+    // 9. Collections Snapshot Listener
+    const unsubCollections = onSnapshot(collection(db, 'recipe_collections'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as RecipeCollection);
+        setCollections(list);
+      } else {
+        INITIAL_COLLECTIONS.forEach(col => {
+          setDoc(doc(db, 'recipe_collections', col.id), col).catch(e => console.warn('Collection seeding:', e));
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'recipe_collections');
+    });
+
+    // 10. Notifications Snapshot Listener
+    const unsubNotifications = onSnapshot(collection(db, 'notifications'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map(d => d.data() as AppNotification);
+        setNotifications(list);
+      } else {
+        INITIAL_NOTIFICATIONS.forEach(notif => {
+          setDoc(doc(db, 'notifications', notif.id), notif).catch(e => console.warn('Notification seeding:', e));
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'notifications');
+    });
+
+    return () => {
+      unsubAuth();
+      unsubRecipes();
+      unsubUsers();
+      unsubComments();
+      unsubTopics();
+      unsubReplies();
+      unsubReports();
+      unsubCollections();
+      unsubNotifications();
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -405,7 +396,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
   };
 
-  const currentUser = users.find(u => u.id === currentUserId) || users[0];
+  const currentUser: UserProfile = users.find(u => u.id === currentUserId) || users[0] || INITIAL_USERS[0];
 
   // Role quick switch
   const switchUserRole = (role: UserRole) => {
@@ -428,7 +419,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // 1-Click login for preloaded seeder accounts without password
+  // 1-Click login for preloaded seeder accounts
   const quickLoginAsUser = (userId: string, remember30Days = true) => {
     const target = users.find(u => u.id === userId);
     if (target) {
@@ -449,7 +440,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Login with email and password with optional 30-day device remember
+  // Firebase Google Auth Login
+  const loginWithGoogle = async (): Promise<boolean> => {
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      if (cred.user) {
+        const fbUser = cred.user;
+        const userRef = doc(db, 'users', fbUser.uid);
+        const snap = await getDoc(userRef);
+        let profile = snap.exists() ? (snap.data() as UserProfile) : null;
+        if (!profile) {
+          const isAdminEmail = fbUser.email === 'medilautaro06@gmail.com' || fbUser.email === 'admin@gusto.app';
+          profile = {
+            id: fbUser.uid,
+            name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cocinero Gusto',
+            firstName: fbUser.displayName?.split(' ')[0] || 'Cocinero',
+            lastName: fbUser.displayName?.split(' ').slice(1).join(' ') || '',
+            username: (fbUser.email?.split('@')[0] || 'usuario').replace(/[^a-zA-Z0-9_]/g, ''),
+            email: fbUser.email || '',
+            avatar: fbUser.photoURL || '/assets/aistudio/default_avatar_b96d7689.jpg',
+            role: isAdminEmail ? 'admin' : 'usuario',
+            bio: 'Miembro activo de la comunidad gastronómica Gusto en Firebase.',
+            specialties: ['Cocina Casera'],
+            dietaryPreferences: [],
+            subprofiles: [],
+            followersCount: 0,
+            followingUserIds: ['user-mateo'],
+            wishlistRecipeIds: []
+          };
+          await setDoc(userRef, profile);
+        }
+        setCurrentUserId(fbUser.uid);
+        setIsAuthenticated(true);
+        localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
+        showToast(`¡Bienvenido a Gusto, ${profile.name}! (Firebase Auth)`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+      showToast('No se pudo completar el inicio de sesión con Google.');
+      return false;
+    }
+  };
+
+  // Login with email and password
   const loginUserWithPassword = (
     email: string,
     password: string,
@@ -495,7 +530,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return res.success;
   };
 
-  // Register new user with firstName, lastName, email, gender, password and default role 'usuario'
+  // Register new user & persist in Firestore
   const registerNewUser = (params: {
     firstName: string;
     lastName: string;
@@ -521,8 +556,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const fullName = `${cleanFirst} ${cleanLast}`;
     const cleanUsername = `${cleanFirst.toLowerCase().replace(/[^a-z0-9]/g, '')}_${cleanLast.toLowerCase().replace(/[^a-z0-9]/g, '')}` || `usuario_${Date.now()}`;
-
-    // Default avatar image uploaded by user
     const avatar = '/assets/aistudio/default_avatar_b96d7689.jpg';
 
     const newUser: UserProfile = {
@@ -535,7 +568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: cleanEmail,
       password: params.password,
       avatar,
-      role: 'usuario', // Rol asignado por defecto: usuario
+      role: 'usuario',
       bio: 'Nuevo aficionado a la cocina y miembro activo de la comunidad Gusto.',
       specialties: ['Cocina Casera'],
       dietaryPreferences: [],
@@ -550,6 +583,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(true);
     localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
     sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUser.id);
+
+    // Save to Firestore
+    setDoc(doc(db, 'users', newUser.id), newUser).catch((err) =>
+      handleFirestoreError(err, OperationType.CREATE, `users/${newUser.id}`)
+    );
 
     showToast(`¡Cuenta creada con éxito! Bienvenido a Gusto, ${cleanFirst} (Rol: Usuario).`);
     return { success: true, message: 'Usuario registrado con éxito.' };
@@ -571,15 +609,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Moderator / Admin role assignment
   const updateUserRole = (userId: string, newRole: UserRole) => {
     setUsers(prev => prev.map(u => (u.id === userId ? { ...u, role: newRole } : u)));
     const targetUser = users.find(u => u.id === userId);
+    setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`)
+    );
     showToast(`Rol de ${targetUser?.name || 'usuario'} actualizado a ${newRole.toUpperCase()}.`);
   };
 
-  // Logout clears session, flags explicitly logged out, and redirects to auth landing page
   const logoutUser = () => {
+    signOut(auth).catch(console.error);
     setIsAuthenticated(false);
     setCurrentUserId('');
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
@@ -591,6 +631,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUserProfile = (data: Partial<UserProfile>) => {
     setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, ...data } : u));
+    setDoc(doc(db, 'users', currentUser.id), data, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `users/${currentUser.id}`)
+    );
     showToast('Perfil actualizado con éxito.');
   };
 
@@ -602,25 +645,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       avatarColor: 'bg-amber-600',
       dietaryRestrictions
     };
-    setUsers(prev => prev.map(u => {
-      if (u.id === currentUser.id) {
-        return {
-          ...u,
-          subprofiles: [...u.subprofiles, newSub]
-        };
-      }
-      return u;
-    }));
+    const nextSubs = [...currentUser.subprofiles, newSub];
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, subprofiles: nextSubs } : u));
+    setDoc(doc(db, 'users', currentUser.id), { subprofiles: nextSubs }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `users/${currentUser.id}`)
+    );
     showToast(`Subperfil familiar "${name}" agregado.`);
   };
 
   const switchActiveSubProfile = (subProfileId: string | null) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === currentUser.id) {
-        return { ...u, activeSubProfileId: subProfileId };
-      }
-      return u;
-    }));
+    setUsers(prev => prev.map(u => (u.id === currentUser.id ? { ...u, activeSubProfileId: subProfileId } : u)));
+    setDoc(doc(db, 'users', currentUser.id), { activeSubProfileId: subProfileId }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `users/${currentUser.id}`)
+    );
     if (subProfileId) {
       const sub = currentUser.subprofiles.find(s => s.id === subProfileId);
       showToast(`Filtros adaptados al subperfil: ${sub?.name}`);
@@ -638,25 +675,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const followUserToggle = (targetUserId: string) => {
     const isFollowing = currentUser.followingUserIds.includes(targetUserId);
+    const nextFollowing = isFollowing
+      ? currentUser.followingUserIds.filter(id => id !== targetUserId)
+      : [...currentUser.followingUserIds, targetUserId];
+
+    const targetUser = users.find(u => u.id === targetUserId);
+    const nextFollowersCount = targetUser
+      ? (isFollowing ? Math.max(0, targetUser.followersCount - 1) : targetUser.followersCount + 1)
+      : 0;
+
     setUsers(prev => prev.map(u => {
-      if (u.id === currentUser.id) {
-        const nextFollowing = isFollowing
-          ? u.followingUserIds.filter(id => id !== targetUserId)
-          : [...u.followingUserIds, targetUserId];
-        return { ...u, followingUserIds: nextFollowing };
-      }
-      if (u.id === targetUserId) {
-        return {
-          ...u,
-          followersCount: isFollowing ? Math.max(0, u.followersCount - 1) : u.followersCount + 1
-        };
-      }
+      if (u.id === currentUser.id) return { ...u, followingUserIds: nextFollowing };
+      if (u.id === targetUserId) return { ...u, followersCount: nextFollowersCount };
       return u;
     }));
-    
+
+    // Persist in Firestore
+    setDoc(doc(db, 'users', currentUser.id), { followingUserIds: nextFollowing }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `users/${currentUser.id}`)
+    );
+    setDoc(doc(db, 'users', targetUserId), { followersCount: nextFollowersCount }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `users/${targetUserId}`)
+    );
+
     if (!isFollowing) {
-      // Add notification to target user
-      const targetUser = users.find(u => u.id === targetUserId);
       if (targetUser) {
         const notif: AppNotification = {
           id: `notif-${Date.now()}`,
@@ -668,6 +710,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           type: 'follow'
         };
         setNotifications(prev => [notif, ...prev]);
+        setDoc(doc(db, 'notifications', notif.id), notif).catch((err) =>
+          handleFirestoreError(err, OperationType.CREATE, `notifications/${notif.id}`)
+        );
       }
       showToast('¡Ahora sigues a este creador!');
     } else {
@@ -675,28 +720,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Recipe Operations
+  // -------------------------------------------------------------
+  // RECIPES OPERATIONS (FIRESTORE PERSISTENT)
+  // -------------------------------------------------------------
   const createRecipe = (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'dislikesCount' | 'likedUserIds' | 'dislikedUserIds' | 'commentsCount'>) => {
     const newId = `rec-${Date.now()}`;
+    const now = new Date().toISOString();
     const newRecipe: Recipe = {
       ...recipeData,
       id: newId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
       likesCount: 0,
       dislikesCount: 0,
       likedUserIds: [],
       dislikedUserIds: [],
-      commentsCount: 0,
+      commentsCount: 0
     };
+
     setRecipes(prev => [newRecipe, ...prev]);
 
-    if (newRecipe.status === 'scheduled') {
-      showToast(`Receta "${newRecipe.title}" programada para el ${new Date(newRecipe.scheduledPublishDate || '').toLocaleDateString('es-ES')}.`);
-    } else if (newRecipe.status === 'draft') {
-      showToast(`Borrador de "${newRecipe.title}" guardado en tu perfil personal.`);
+    // Persist in Firestore
+    setDoc(doc(db, 'recipes', newId), newRecipe).catch((err) =>
+      handleFirestoreError(err, OperationType.CREATE, `recipes/${newId}`)
+    );
+
+    if (newRecipe.status === 'published') {
+      showToast(`¡Receta "${newRecipe.title}" publicada en el catálogo!`);
+    } else if (newRecipe.status === 'scheduled') {
+      showToast(`Receta "${newRecipe.title}" programada para publicación.`);
     } else {
-      showToast(`¡Receta "${newRecipe.title}" publicada en la comunidad!`);
+      showToast(`Borrador "${newRecipe.title}" guardado.`);
     }
     return newId;
   };
@@ -708,7 +762,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
-    // Permission validation: author, co-author, editor, or admin
     const isAuthor = target.authorId === currentUser.id;
     const isCoAuthor = Boolean(target.coAuthors && target.coAuthors.some(ca =>
       ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
@@ -723,12 +776,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
-    // Status & integrity restrictions
     let sanitizedData = { ...recipeData };
-
     if (target.status === 'published') {
-      // Published recipe restrictions:
-      // Preserve original author identity, publication timestamp, and community metrics
       sanitizedData = {
         ...sanitizedData,
         authorId: target.authorId,
@@ -740,29 +789,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         likedUserIds: target.likedUserIds,
         dislikedUserIds: target.dislikedUserIds,
         commentsCount: target.commentsCount,
-        // Published recipes maintain published status unless staff explicitly changes it
         status: isStaff && sanitizedData.status ? sanitizedData.status : 'published'
       };
     }
 
-    setRecipes(prev => prev.map(r => r.id === id ? {
-      ...r,
+    const updatedRecipe: Recipe = {
+      ...target,
       ...sanitizedData,
       updatedAt: new Date().toISOString()
-    } : r));
+    };
 
-    if (target.status === 'draft') {
-      if (sanitizedData.status === 'published') {
-        showToast(`¡Borrador "${sanitizedData.title || target.title}" publicado con éxito en el catálogo!`);
-      } else if (sanitizedData.status === 'scheduled') {
-        showToast(`Borrador "${sanitizedData.title || target.title}" programado para publicación automática.`);
-      } else {
-        showToast(`Borrador "${sanitizedData.title || target.title}" guardado correctamente.`);
-      }
-    } else {
-      showToast(`Receta "${sanitizedData.title || target.title}" actualizada correctamente.`);
-    }
+    setRecipes(prev => prev.map(r => r.id === id ? updatedRecipe : r));
 
+    // Persist in Firestore
+    setDoc(doc(db, 'recipes', id), updatedRecipe, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `recipes/${id}`)
+    );
+
+    showToast(`Receta "${updatedRecipe.title}" actualizada en Firestore.`);
     return true;
   };
 
@@ -773,43 +817,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
-    // Check permissions: author, editor, or admin
     const canDelete = currentUser.role === 'admin' || currentUser.role === 'editor' || target.authorId === currentUser.id;
     if (!canDelete) {
       showToast('No tienes permisos suficientes para eliminar esta receta.');
       return false;
     }
 
-    // 1. Remove recipe from state
     setRecipes(prev => prev.filter(r => r.id !== id));
-    // 2. Remove ingredients from shopping cart
     setCart(prev => prev.filter(c => c.recipeId !== id));
-    // 3. Remove from compare list
     setComparingRecipeIds(prev => prev.filter(cid => cid !== id));
-    // 4. Remove comments belonging to this recipe
     setComments(prev => prev.filter(c => c.recipeId !== id));
-    // 5. Remove from collections
-    setCollections(prev => prev.map(col => ({
-      ...col,
-      recipeIds: col.recipeIds.filter(rid => rid !== id)
-    })));
-    // 6. Remove from users' pinned recipe and wishlists
-    setUsers(prev => prev.map(u => ({
-      ...u,
-      pinnedRecipeId: u.pinnedRecipeId === id ? undefined : u.pinnedRecipeId,
-      wishlistRecipeIds: u.wishlistRecipeIds.filter(wid => wid !== id)
-    })));
-    // 7. Clear printable recipe if it's the deleted one
-    setPrintableRecipe(prev => prev?.id === id ? null : prev);
-    // 8. Update any pending moderation reports for this recipe
-    setReports(prev => prev.map(rep => {
-      if (rep.targetType === 'recipe' && rep.targetId === id && rep.status === 'pending') {
-        return { ...rep, status: 'resolved_removed' };
-      }
-      return rep;
-    }));
 
-    showToast(`Receta "${target.title}" eliminada con éxito.`);
+    // Delete in Firestore
+    deleteDoc(doc(db, 'recipes', id)).catch((err) =>
+      handleFirestoreError(err, OperationType.DELETE, `recipes/${id}`)
+    );
+
+    showToast(`Receta "${target.title}" eliminada de la base de datos.`);
     return true;
   };
 
@@ -817,155 +841,147 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = recipes.find(r => r.id === recipeId);
     if (!target) return;
     
-    // Check permission: author or editor or admin
     if (target.authorId !== currentUser.id && currentUser.role !== 'editor' && currentUser.role !== 'admin') {
       showToast('Solo los autores o editores pueden fijar recetas en el perfil.');
       return;
     }
 
     const nextState = !target.isPinned;
-    setRecipes(prev => prev.map(r => {
-      if (r.id === recipeId) {
-        return { ...r, isPinned: nextState };
-      }
-      // If pinning a new recipe, unpin any other recipe by this author
-      if (nextState && r.authorId === target.authorId && r.isPinned) {
-        return { ...r, isPinned: false };
-      }
-      return r;
-    }));
+    setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, isPinned: nextState } : r));
+    setDoc(doc(db, 'recipes', recipeId), { isPinned: nextState }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `recipes/${recipeId}`)
+    );
 
-    setUsers(prev => prev.map(u => {
-      if (u.id === currentUser.id) {
-        return { ...u, pinnedRecipeId: nextState ? recipeId : undefined };
-      }
-      return u;
-    }));
-
-    showToast(nextState ? 'Receta fijada en la parte superior de tu perfil.' : 'Receta desfijada del perfil.');
+    showToast(nextState ? 'Receta fijada en tu perfil.' : 'Receta desfijada del perfil.');
   };
 
   const toggleLikeRecipe = (recipeId: string) => {
     const targetRecipe = recipes.find(r => r.id === recipeId);
     const wasAlreadyLiked = targetRecipe ? targetRecipe.likedUserIds.includes(currentUser.id) : false;
 
+    let updatedRecipe: Recipe | null = null;
     setRecipes(prev => prev.map(r => {
       if (r.id !== recipeId) return r;
-      const alreadyLiked = r.likedUserIds.includes(currentUser.id);
-      const alreadyDisliked = r.dislikedUserIds.includes(currentUser.id);
+      const isLiked = r.likedUserIds.includes(currentUser.id);
+      const isDisliked = r.dislikedUserIds.includes(currentUser.id);
 
-      const nextLiked = alreadyLiked
-        ? r.likedUserIds.filter(id => id !== currentUser.id)
-        : [...r.likedUserIds, currentUser.id];
-      const nextDisliked = alreadyDisliked
-        ? r.dislikedUserIds.filter(id => id !== currentUser.id)
-        : r.dislikedUserIds;
+      let nextLiked = [...r.likedUserIds];
+      let nextDisliked = [...r.dislikedUserIds];
 
-      const diffLikes = alreadyLiked ? -1 : 1;
-      const diffDislikes = alreadyDisliked ? -1 : 0;
+      if (isLiked) {
+        nextLiked = nextLiked.filter(id => id !== currentUser.id);
+      } else {
+        nextLiked.push(currentUser.id);
+        nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
+      }
 
-      return {
+      updatedRecipe = {
         ...r,
+        likesCount: nextLiked.length,
+        dislikesCount: nextDisliked.length,
         likedUserIds: nextLiked,
-        dislikedUserIds: nextDisliked,
-        likesCount: Math.max(0, (r.likesCount ?? 0) + diffLikes),
-        dislikesCount: Math.max(0, (r.dislikesCount ?? 0) + diffDislikes)
+        dislikedUserIds: nextDisliked
       };
+      return updatedRecipe;
     }));
 
-    // If adding a like (not unliking), notify the recipe owner
-    if (!wasAlreadyLiked && targetRecipe) {
-      const notif: AppNotification = {
-        id: `notif-like-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        userId: targetRecipe.authorId,
-        title: '¡A alguien le gustó tu receta!',
-        message: `A ${currentUser.name} le ha gustado tu receta "${targetRecipe.title}".`,
-        createdAt: new Date().toISOString(),
-        read: false,
-        type: 'like',
-        linkTarget: recipeId
-      };
-      setNotifications(prev => [notif, ...prev]);
+    if (updatedRecipe) {
+      const rec = updatedRecipe as Recipe;
+      setDoc(doc(db, 'recipes', recipeId), {
+        likesCount: rec.likesCount,
+        dislikesCount: rec.dislikesCount,
+        likedUserIds: rec.likedUserIds,
+        dislikedUserIds: rec.dislikedUserIds
+      }, { merge: true }).catch((err) =>
+        handleFirestoreError(err, OperationType.UPDATE, `recipes/${recipeId}`)
+      );
+    }
+
+    if (!wasAlreadyLiked) {
+      showToast('¡Has valorado positivamente esta receta!');
+    } else {
+      showToast('Valoración retirada.');
     }
   };
 
   const toggleDislikeRecipe = (recipeId: string) => {
+    let updatedRecipe: Recipe | null = null;
     setRecipes(prev => prev.map(r => {
       if (r.id !== recipeId) return r;
-      const alreadyLiked = r.likedUserIds.includes(currentUser.id);
-      const alreadyDisliked = r.dislikedUserIds.includes(currentUser.id);
+      const isLiked = r.likedUserIds.includes(currentUser.id);
+      const isDisliked = r.dislikedUserIds.includes(currentUser.id);
 
-      const nextDisliked = alreadyDisliked
-        ? r.dislikedUserIds.filter(id => id !== currentUser.id)
-        : [...r.dislikedUserIds, currentUser.id];
-      const nextLiked = alreadyLiked
-        ? r.likedUserIds.filter(id => id !== currentUser.id)
-        : r.likedUserIds;
+      let nextLiked = [...r.likedUserIds];
+      let nextDisliked = [...r.dislikedUserIds];
 
-      const diffDislikes = alreadyDisliked ? -1 : 1;
-      const diffLikes = alreadyLiked ? -1 : 0;
+      if (isDisliked) {
+        nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
+      } else {
+        nextDisliked.push(currentUser.id);
+        nextLiked = nextLiked.filter(id => id !== currentUser.id);
+      }
 
-      return {
+      updatedRecipe = {
         ...r,
+        likesCount: nextLiked.length,
+        dislikesCount: nextDisliked.length,
         likedUserIds: nextLiked,
-        dislikedUserIds: nextDisliked,
-        likesCount: Math.max(0, (r.likesCount ?? 0) + diffLikes),
-        dislikesCount: Math.max(0, (r.dislikesCount ?? 0) + diffDislikes)
+        dislikedUserIds: nextDisliked
       };
+      return updatedRecipe;
     }));
+
+    if (updatedRecipe) {
+      const rec = updatedRecipe as Recipe;
+      setDoc(doc(db, 'recipes', recipeId), {
+        likesCount: rec.likesCount,
+        dislikesCount: rec.dislikesCount,
+        likedUserIds: rec.likedUserIds,
+        dislikedUserIds: rec.dislikedUserIds
+      }, { merge: true }).catch((err) =>
+        handleFirestoreError(err, OperationType.UPDATE, `recipes/${recipeId}`)
+      );
+    }
   };
 
   const publishScheduledNow = (recipeId: string) => {
-    changeRecipeStatus(recipeId, 'published');
+    const target = recipes.find(r => r.id === recipeId);
+    if (!target) return;
+    if (target.authorId !== currentUser.id && currentUser.role !== 'admin' && currentUser.role !== 'editor') {
+      showToast('Solo el autor o moderadores pueden publicar esta receta programada.');
+      return;
+    }
+
+    setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, status: 'published', scheduledPublishDate: undefined } : r));
+    setDoc(doc(db, 'recipes', recipeId), { status: 'published', scheduledPublishDate: null }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `recipes/${recipeId}`)
+    );
+    showToast(`¡Receta "${target.title}" publicada en el catálogo comunitario!`);
   };
 
   const changeRecipeStatus = (recipeId: string, newStatus: RecipeStatus, scheduledDate?: string) => {
     const target = recipes.find(r => r.id === recipeId);
     if (!target) return;
 
-    let isoScheduled: string | undefined = undefined;
-    if (newStatus === 'scheduled') {
-      try {
-        const d = scheduledDate ? new Date(scheduledDate) : new Date(Date.now() + 86400000 * 3);
-        isoScheduled = isNaN(d.getTime()) ? new Date(Date.now() + 86400000 * 3).toISOString() : d.toISOString();
-      } catch {
-        isoScheduled = new Date(Date.now() + 86400000 * 3).toISOString();
-      }
-    }
+    setRecipes(prev => prev.map(r => r.id === recipeId ? {
+      ...r,
+      status: newStatus,
+      scheduledPublishDate: scheduledDate ? new Date(scheduledDate).toISOString() : undefined
+    } : r));
 
-    setRecipes(prev => prev.map(r => {
-      if (r.id === recipeId) {
-        return {
-          ...r,
-          status: newStatus,
-          scheduledPublishDate: isoScheduled,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return r;
-    }));
+    setDoc(doc(db, 'recipes', recipeId), {
+      status: newStatus,
+      scheduledPublishDate: scheduledDate ? new Date(scheduledDate).toISOString() : null
+    }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `recipes/${recipeId}`)
+    );
 
-    if (newStatus === 'published') {
-      const notif: AppNotification = {
-        id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        userId: target.authorId,
-        title: 'Receta publicada',
-        message: `Tu receta "${target.title}" ha sido publicada exitosamente en el catálogo.`,
-        createdAt: new Date().toISOString(),
-        read: false,
-        type: 'scheduled_published',
-        linkTarget: target.id
-      };
-      setNotifications(prev => [notif, ...prev]);
-      showToast(`¡Receta "${target.title}" publicada en la comunidad!`);
-    } else if (newStatus === 'draft') {
-      showToast(`Receta "${target.title}" guardada como borrador privado.`);
-    } else if (newStatus === 'scheduled') {
-      showToast(`Receta "${target.title}" programada para publicación automática.`);
-    }
+    showToast(`Estado de receta cambiado a ${newStatus.toUpperCase()}`);
   };
 
-  // Comments
+  // -------------------------------------------------------------
+  // COMMENTS & RATINGS (FIRESTORE PERSISTENT)
+  // -------------------------------------------------------------
   const addComment = (recipeId: string, content: string, parentCommentId?: string) => {
     if (!content.trim()) return;
     const newComment: RecipeComment = {
@@ -981,83 +997,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dislikedUserIds: [],
       parentCommentId
     };
+
     setComments(prev => [...prev, newComment]);
     setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, commentsCount: r.commentsCount + 1 } : r));
 
-    // Send notification to recipe owner
+    // Save to Firestore
+    setDoc(doc(db, 'recipe_comments', newComment.id), newComment).catch((err) =>
+      handleFirestoreError(err, OperationType.CREATE, `recipe_comments/${newComment.id}`)
+    );
+
+    // Update recipe commentsCount in Firestore
     const targetRecipe = recipes.find(r => r.id === recipeId);
     if (targetRecipe) {
-      const notif: AppNotification = {
-        id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        userId: targetRecipe.authorId,
-        title: 'Nuevo comentario en tu receta',
-        message: `${currentUser.name} ha comentado en tu receta "${targetRecipe.title}".`,
-        createdAt: new Date().toISOString(),
-        read: false,
-        type: 'comment',
-        linkTarget: recipeId
-      };
-      setNotifications(prev => [notif, ...prev]);
+      setDoc(doc(db, 'recipes', recipeId), { commentsCount: targetRecipe.commentsCount + 1 }, { merge: true }).catch(console.warn);
     }
 
-    // If replying to another comment, also notify parent comment author if different
-    if (parentCommentId) {
-      const parentComment = comments.find(c => c.id === parentCommentId);
-      if (parentComment && parentComment.authorId !== currentUser.id && parentComment.authorId !== targetRecipe?.authorId) {
-        const replyNotif: AppNotification = {
-          id: `notif-reply-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          userId: parentComment.authorId,
-          title: 'Respuesta a tu comentario',
-          message: `${currentUser.name} respondió a tu comentario en "${targetRecipe?.title || 'una receta'}".`,
-          createdAt: new Date().toISOString(),
-          read: false,
-          type: 'comment',
-          linkTarget: recipeId
-        };
-        setNotifications(prev => [replyNotif, ...prev]);
-      }
-    }
-
-    showToast('Comentario publicado en la receta.');
+    showToast('Comentario guardado en Firestore.');
   };
 
   const editComment = (commentId: string, newContent: string) => {
     if (!newContent.trim()) return;
-    setComments(prev => prev.map(c => {
-      if (c.id === commentId) {
-        return {
-          ...c,
-          content: newContent.trim(),
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return c;
-    }));
-    showToast('Comentario editado correctamente.');
+    setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: newContent.trim(), updatedAt: new Date().toISOString() } : c));
+    setDoc(doc(db, 'recipe_comments', commentId), { content: newContent.trim(), updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `recipe_comments/${commentId}`)
+    );
+    showToast('Comentario editado.');
   };
 
   const deleteComment = (commentId: string) => {
     const target = comments.find(c => c.id === commentId);
     if (!target) return;
     setComments(prev => prev.filter(c => c.id !== commentId && c.parentCommentId !== commentId));
-    setRecipes(prev => prev.map(r => {
-      if (r.id === target.recipeId) {
-        return { ...r, commentsCount: Math.max(0, r.commentsCount - 1) };
-      }
-      return r;
-    }));
-    showToast('Comentario eliminado.');
+    setRecipes(prev => prev.map(r => r.id === target.recipeId ? { ...r, commentsCount: Math.max(0, r.commentsCount - 1) } : r));
+
+    deleteDoc(doc(db, 'recipe_comments', commentId)).catch((err) =>
+      handleFirestoreError(err, OperationType.DELETE, `recipe_comments/${commentId}`)
+    );
+    showToast('Comentario eliminado de Firestore.');
   };
 
   const toggleCommentVote = (commentId: string, type: 'like' | 'dislike') => {
+    let nextComment: RecipeComment | null = null;
     setComments(prev => prev.map(c => {
       if (c.id !== commentId) return c;
-
-      const baseLikes = c.baseLikes !== undefined
-        ? c.baseLikes
-        : (c.likedUserIds && c.likedUserIds.length > 0 ? Math.max(0, (c.likes ?? 0) - c.likedUserIds.length) : (c.likes ?? 0));
+      const baseLikes = c.baseLikes ?? 0;
       const baseDislikes = c.baseDislikes ?? 0;
-
       const likedList = c.likedUserIds || [];
       const dislikedList = c.dislikedUserIds || [];
       const isLiked = likedList.includes(currentUser.id);
@@ -1082,7 +1066,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      return {
+      nextComment = {
         ...c,
         baseLikes,
         baseDislikes,
@@ -1090,7 +1074,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dislikedUserIds: nextDisliked,
         likes: baseLikes + nextLiked.length
       };
+      return nextComment;
     }));
+
+    if (nextComment) {
+      const comm = nextComment as RecipeComment;
+      setDoc(doc(db, 'recipe_comments', commentId), {
+        likes: comm.likes,
+        likedUserIds: comm.likedUserIds,
+        dislikedUserIds: comm.dislikedUserIds
+      }, { merge: true }).catch((err) =>
+        handleFirestoreError(err, OperationType.UPDATE, `recipe_comments/${commentId}`)
+      );
+    }
   };
 
   // Recipe Comparison
@@ -1129,17 +1125,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     setCart(prev => [...prev, ...newItems]);
-    showToast(`${newItems.length} ingredientes de "${recipe.title}" agregados al carrito virtual.`);
+    showToast(`${newItems.length} ingredientes de "${recipe.title}" agregados al carrito.`);
   };
 
   const togglePantryItem = (cartItemId: string) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === cartItemId) {
-        const next = !item.haveInPantry;
-        return { ...item, haveInPantry: next };
-      }
-      return item;
-    }));
+    setCart(prev => prev.map(item => item.id === cartItemId ? { ...item, haveInPantry: !item.haveInPantry } : item));
   };
 
   const removeFromCart = (cartItemId: string) => {
@@ -1154,18 +1144,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Wishlist & Collections
   const toggleWishlist = (recipeId: string) => {
     const inWishlist = currentUser.wishlistRecipeIds.includes(recipeId);
-    setUsers(prev => prev.map(u => {
-      if (u.id === currentUser.id) {
-        return {
-          ...u,
-          wishlistRecipeIds: inWishlist
-            ? u.wishlistRecipeIds.filter(id => id !== recipeId)
-            : [...u.wishlistRecipeIds, recipeId]
-        };
-      }
-      return u;
-    }));
-    showToast(inWishlist ? 'Eliminado de tu lista de deseos.' : 'Guardado en tu lista de deseos para cocinar luego.');
+    const nextList = inWishlist
+      ? currentUser.wishlistRecipeIds.filter(id => id !== recipeId)
+      : [...currentUser.wishlistRecipeIds, recipeId];
+
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, wishlistRecipeIds: nextList } : u));
+    setDoc(doc(db, 'users', currentUser.id), { wishlistRecipeIds: nextList }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `users/${currentUser.id}`)
+    );
+
+    showToast(inWishlist ? 'Eliminado de tu lista de deseos.' : 'Guardado en tu lista de deseos.');
   };
 
   const createCollection = (name: string, description: string, recipeIds: string[], isPrivate = false) => {
@@ -1179,18 +1167,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       coverImage: recipes.find(r => recipeIds.includes(r.id))?.coverImage
     };
     setCollections(prev => [newCol, ...prev]);
-    showToast(`Colección personal "${name}" creada.`);
+    setDoc(doc(db, 'recipe_collections', newCol.id), newCol).catch((err) =>
+      handleFirestoreError(err, OperationType.CREATE, `recipe_collections/${newCol.id}`)
+    );
+    showToast(`Colección personal "${name}" creada en Firestore.`);
   };
 
   const toggleRecipeInCollection = (collectionId: string, recipeId: string) => {
-    setCollections(prev => prev.map(c => {
-      if (c.id === collectionId) {
-        const exists = c.recipeIds.includes(recipeId);
-        const nextIds = exists ? c.recipeIds.filter(id => id !== recipeId) : [...c.recipeIds, recipeId];
-        return { ...c, recipeIds: nextIds };
-      }
-      return c;
-    }));
+    const target = collections.find(c => c.id === collectionId);
+    if (!target) return;
+    const exists = target.recipeIds.includes(recipeId);
+    const nextIds = exists ? target.recipeIds.filter(id => id !== recipeId) : [...target.recipeIds, recipeId];
+
+    setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, recipeIds: nextIds } : c));
+    setDoc(doc(db, 'recipe_collections', collectionId), { recipeIds: nextIds }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `recipe_collections/${collectionId}`)
+    );
     showToast('Colección actualizada.');
   };
 
@@ -1209,14 +1201,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString()
     };
     setReports(prev => [newReport, ...prev]);
-    showToast('Tu reporte ha sido enviado a los moderadores. Gracias por mantener la comunidad segura.');
+    setDoc(doc(db, 'moderation_reports', newReport.id), newReport).catch((err) =>
+      handleFirestoreError(err, OperationType.CREATE, `moderation_reports/${newReport.id}`)
+    );
+    showToast('Tu reporte ha sido enviado a Firestore para moderación.');
   };
 
   const resolveReport = (reportId: string, resolution: 'removed' | 'dismissed') => {
     const report = reports.find(r => r.id === reportId);
     if (!report) return;
 
-    // Permissions: admin or editor
     if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
       showToast('No tienes permisos de moderación para realizar esta acción.');
       return;
@@ -1224,40 +1218,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (resolution === 'removed') {
       if (report.targetType === 'recipe') {
-        const recipeId = report.targetId;
-        // Cascade delete recipe
-        setRecipes(prev => prev.filter(r => r.id !== recipeId));
-        setCart(prev => prev.filter(c => c.recipeId !== recipeId));
-        setComparingRecipeIds(prev => prev.filter(cid => cid !== recipeId));
-        setComments(prev => prev.filter(c => c.recipeId !== recipeId));
-        setCollections(prev => prev.map(col => ({
-          ...col,
-          recipeIds: col.recipeIds.filter(rid => rid !== recipeId)
-        })));
-        setUsers(prev => prev.map(u => ({
-          ...u,
-          pinnedRecipeId: u.pinnedRecipeId === recipeId ? undefined : u.pinnedRecipeId,
-          wishlistRecipeIds: u.wishlistRecipeIds.filter(wid => wid !== recipeId)
-        })));
-        setPrintableRecipe(prev => prev?.id === recipeId ? null : prev);
+        deleteRecipe(report.targetId);
       } else {
         setUsers(prev => prev.map(u => u.id === report.targetId ? { ...u, isBanned: true } : u));
+        setDoc(doc(db, 'users', report.targetId), { isBanned: true }, { merge: true }).catch(console.warn);
       }
     }
 
-    setReports(prev => prev.map(r => r.id === reportId ? {
-      ...r,
-      status: resolution === 'removed' ? 'resolved_removed' : 'dismissed'
-    } : r));
-
-    showToast(
-      resolution === 'removed'
-        ? (report.targetType === 'recipe' ? `Receta "${report.targetTitleOrName}" eliminada de la plataforma.` : 'Perfil suspendido y reporte resuelto.')
-        : 'Reporte desestimado: el contenido se mantendrá activo.'
+    const nextStatus = resolution === 'removed' ? 'resolved_removed' : 'dismissed';
+    setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: nextStatus, resolvedAt: new Date().toISOString() } : r));
+    setDoc(doc(db, 'moderation_reports', reportId), { status: nextStatus, resolvedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `moderation_reports/${reportId}`)
     );
+
+    showToast('Reporte actualizado en Firestore.');
   };
 
-  // Forum
+  // -------------------------------------------------------------
+  // FORUM (COMMUNITY DISCUSSIONS IN FIRESTORE)
+  // -------------------------------------------------------------
   const createForumTopic = (category: ForumTopic['category'], title: string, content: string, tags: string[]) => {
     const newId = `top-${Date.now()}`;
     const newTopic: ForumTopic = {
@@ -1274,8 +1253,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       viewsCount: 1,
       tags
     };
+
     setForumTopics(prev => [newTopic, ...prev]);
-    showToast(`Hilo de debate "${title}" iniciado en el foro.`);
+    setDoc(doc(db, 'forum_topics', newId), newTopic).catch((err) =>
+      handleFirestoreError(err, OperationType.CREATE, `forum_topics/${newId}`)
+    );
+
+    showToast(`Debate "${title}" publicado en Firestore.`);
     return newId;
   };
 
@@ -1295,9 +1279,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       likedUserIds: [],
       dislikedUserIds: []
     };
+
     setForumReplies(prev => [...prev, newReply]);
     setForumTopics(prev => prev.map(t => t.id === topicId ? { ...t, repliesCount: t.repliesCount + 1 } : t));
-    showToast('Respuesta publicada en el debate.');
+
+    setDoc(doc(db, 'forum_replies', newReply.id), newReply).catch((err) =>
+      handleFirestoreError(err, OperationType.CREATE, `forum_replies/${newReply.id}`)
+    );
+
+    const topic = forumTopics.find(t => t.id === topicId);
+    if (topic) {
+      setDoc(doc(db, 'forum_topics', topicId), {
+        repliesCount: topic.repliesCount + 1,
+        lastActivityAt: new Date().toISOString()
+      }, { merge: true }).catch(console.warn);
+    }
+
+    showToast('Respuesta guardada en el debate.');
   };
 
   const toggleForumReplyLike = (replyId: string) => {
@@ -1305,14 +1303,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleForumReplyVote = (replyId: string, type: 'like' | 'dislike') => {
+    let nextReply: ForumReply | null = null;
     setForumReplies(prev => prev.map(r => {
       if (r.id !== replyId) return r;
-
-      const baseLikes = r.baseLikes !== undefined
-        ? r.baseLikes
-        : (r.likedUserIds && r.likedUserIds.length > 0 ? Math.max(0, (r.likesCount ?? 0) - r.likedUserIds.length) : (r.likesCount ?? 0));
+      const baseLikes = r.baseLikes ?? 0;
       const baseDislikes = r.baseDislikes ?? 0;
-
       const likedList = r.likedUserIds || [];
       const dislikedList = r.dislikedUserIds || [];
       const isLiked = likedList.includes(currentUser.id);
@@ -1337,7 +1332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      return {
+      nextReply = {
         ...r,
         baseLikes,
         baseDislikes,
@@ -1345,157 +1340,120 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dislikedUserIds: nextDisliked,
         likesCount: baseLikes + nextLiked.length
       };
+      return nextReply;
     }));
+
+    if (nextReply) {
+      const rep = nextReply as ForumReply;
+      setDoc(doc(db, 'forum_replies', replyId), {
+        likesCount: rep.likesCount,
+        likedUserIds: rep.likedUserIds,
+        dislikedUserIds: rep.dislikedUserIds
+      }, { merge: true }).catch((err) =>
+        handleFirestoreError(err, OperationType.UPDATE, `forum_replies/${replyId}`)
+      );
+    }
   };
 
   const editForumReply = (replyId: string, content: string) => {
     if (!content.trim()) return;
-    setForumReplies(prev => prev.map(r => r.id === replyId ? { ...r, content: content.trim(), updatedAt: new Date().toISOString() } : r));
-    showToast('Respuesta editada correctamente.');
+    setForumReplies(prev => prev.map(r => r.id === replyId ? { ...r, content: content.trim() } : r));
+    setDoc(doc(db, 'forum_replies', replyId), { content: content.trim() }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `forum_replies/${replyId}`)
+    );
+    showToast('Respuesta editada.');
   };
 
   const deleteForumReply = (replyId: string) => {
-    const target = forumReplies.find(r => r.id === replyId);
-    if (!target) return;
     setForumReplies(prev => prev.filter(r => r.id !== replyId));
-    setForumTopics(prev => prev.map(t => t.id === target.topicId ? { ...t, repliesCount: Math.max(0, t.repliesCount - 1) } : t));
+    deleteDoc(doc(db, 'forum_replies', replyId)).catch((err) =>
+      handleFirestoreError(err, OperationType.DELETE, `forum_replies/${replyId}`)
+    );
     showToast('Respuesta eliminada.');
   };
 
   const markBestAnswer = (replyId: string) => {
-    setForumReplies(prev => prev.map(r => ({
-      ...r,
-      isBestAnswer: r.id === replyId ? !r.isBestAnswer : false
-    })));
-    showToast('Respuesta destacada de la comunidad actualizada.');
+    setForumReplies(prev => prev.map(r => r.id === replyId ? { ...r, isBestAnswer: true } : r));
+    setDoc(doc(db, 'forum_replies', replyId), { isBestAnswer: true }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `forum_replies/${replyId}`)
+    );
+    showToast('Marcada como mejor respuesta.');
   };
 
   // Notifications
   const markNotificationAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setDoc(doc(db, 'notifications', id), { read: true }, { merge: true }).catch((err) =>
+      handleFirestoreError(err, OperationType.UPDATE, `notifications/${id}`)
+    );
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => n.userId === currentUser.id ? { ...n, read: true } : n));
-    showToast('Todas tus notificaciones marcadas como leídas.');
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    notifications.forEach(n => {
+      setDoc(doc(db, 'notifications', n.id), { read: true }, { merge: true }).catch(console.warn);
+    });
+    showToast('Todas las notificaciones marcadas como leídas.');
   };
 
-  // Exporting & Printing
-  const exportRecipePdf = (recipe: Recipe) => {
-    // Prompt confirmation dialog before downloading
-    setRecipeToConfirmDownload(recipe);
-  };
-
+  // Export functions
   const executeDownloadRecipePdf = (recipeOverride?: Recipe) => {
-    const target = recipeOverride || recipeToConfirmDownload;
+    const target = recipeOverride || recipeToConfirmDownload || printableRecipe;
     if (!target) return;
-    try {
-      downloadRecipePdf(target);
-      showToast(`Receta "${target.title}" descargada en formato PDF.`);
-    } catch (err) {
-      console.error('Error al generar PDF:', err);
-      showToast('Error al generar el PDF de la receta.');
-    } finally {
-      setRecipeToConfirmDownload(null);
-    }
+    downloadRecipePdf(target);
+    showToast(`PDF de "${target.title}" descargado exitosamente.`);
+    setRecipeToConfirmDownload(null);
+  };
+
+  const exportRecipePdf = (recipe: Recipe) => {
+    downloadRecipePdf(recipe);
+    showToast(`PDF de "${recipe.title}" descargado exitosamente.`);
   };
 
   const exportRecipeJson = (recipe: Recipe) => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(recipe, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `${recipe.title.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.json`);
+    downloadAnchor.setAttribute('download', `${recipe.title.toLowerCase().replace(/\s+/g, '_')}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    showToast(`Receta "${recipe.title}" exportada en formato JSON.`);
+    showToast(`Archivo JSON de "${recipe.title}" descargado.`);
   };
 
   const exportRecipeText = (recipe: Recipe) => {
-    const textContent = `
-========================================
-${recipe.title.toUpperCase()}
-========================================
-Por: ${recipe.authorName} ${recipe.coAuthors.length > 0 ? `| Co-autores: ${recipe.coAuthors.join(', ')}` : ''}
-Dificultad: ${recipe.difficulty} | Porciones: ${recipe.servings}
-Tiempo: Prep ${recipe.prepTimeMin} min | Cocción ${recipe.cookTimeMin} min
-Categoría: ${recipe.category}
-Etiquetas: ${recipe.tags.join(', ')}
-
-DESCRIPCIÓN:
-${recipe.description}
-
-INFORMACIÓN NUTRICIONAL (Por porción):
-Calorías: ${recipe.nutrition.calories} kcal | Proteínas: ${recipe.nutrition.proteinG}g
-Carbohidratos: ${recipe.nutrition.carbsG}g | Grasas: ${recipe.nutrition.fatG}g | Fibra: ${recipe.nutrition.fiberG}g
-
-INGREDIENTES:
-${recipe.ingredients.map(ing => `- ${ing.quantity} ${ing.unit} de ${ing.name} (Tienda: ${ing.storeName})`).join('\n')}
-
-PASO A PASO:
-${recipe.steps.map(s => `${s.stepNumber}. ${s.title} (${s.durationMinutes} min)\n   ${s.description}${s.tip ? `\n   Consejo: ${s.tip}` : ''}`).join('\n\n')}
-
-Gusto - Sistema de Gestión de Recetas.
-    `.trim();
-
-    const dataStr = 'data:text/plain;charset=utf-8,' + encodeURIComponent(textContent);
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `${recipe.title.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.txt`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    showToast(`Tarjeta de lectura rápida exportada.`);
+    const txt = `RECETA: ${recipe.title.toUpperCase()}\nCategoría: ${recipe.category}\nPorciones: ${recipe.servings}\nTiempo: ${recipe.prepTimeMin + recipe.cookTimeMin} minutos\n\nINGREDIENTES:\n${recipe.ingredients.map(i => `- ${i.quantity} ${i.unit} ${i.name}`).join('\n')}\n\nPASOS:\n${recipe.steps.map(s => `${s.stepNumber}. ${s.title}: ${s.description}`).join('\n')}`;
+    const element = document.createElement('a');
+    const file = new Blob([txt], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `${recipe.title.toLowerCase().replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    element.remove();
+    showToast(`Archivo de texto de "${recipe.title}" descargado.`);
   };
 
-  const getFamousWeeklyRecipes = (): Recipe[] => {
-    return [...recipes]
-      .filter((r) => r.status === 'published')
-      .sort((a, b) => b.likesCount - a.likesCount);
-  };
+  const exportRecipePackagePdf = (collectionObj?: RecipeCollection) => {
+    const targetRecipes = collectionObj
+      ? recipes.filter(r => collectionObj.recipeIds.includes(r.id))
+      : recipes.slice(0, 5);
 
-  const exportWeeklyPlannerPdf = (): boolean => {
-    const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
-    if (!isPremiumOrAdmin) {
-      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi perfil para descargar el Planificador Semanal en formato .PDF');
-      return false;
-    }
-    const famous = getFamousWeeklyRecipes();
-    downloadWeeklyPlannerPdf({
-      famousRecipes: famous.length > 0 ? famous : recipes,
-      currentUser,
-      weekTitle: 'Planificador Semanal Gourmet Gusto'
+    downloadRecipePackagePdf({
+      packageName: collectionObj?.name || 'Recetario Gusto Gourmet',
+      description: collectionObj?.description || 'Colección especial de preparaciones culinarias.',
+      recipes: targetRecipes,
+      curatedBy: currentUser.name
     });
-    showToast('Planificador semanal exportado exitosamente en formato .PDF');
+    showToast('Recetario descargado en PDF.');
     return true;
   };
 
-  const exportRecipePackagePdf = (collection?: RecipeCollection): boolean => {
-    const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
-    if (!isPremiumOrAdmin) {
-      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi perfil para exportar paquetes de recetas en formato .PDF');
-      return false;
-    }
+  const getFamousWeeklyRecipes = () => {
+    return recipes.slice(0, 5);
+  };
 
-    if (collection) {
-      const collectedRecipes = recipes.filter((r) => collection.recipeIds.includes(r.id));
-      if (collectedRecipes.length === 0) {
-        showToast('Esta colección aún no tiene recetas agregadas.');
-        return false;
-      }
-      downloadRecipePackagePdf({
-        packageName: collection.name,
-        description: collection.description || 'Colección privada seleccionada de recetas.',
-        recipes: collectedRecipes,
-        curatedBy: currentUser.name,
-      });
-      showToast(`Paquete culinario "${collection.name}" exportado exitosamente en formato .PDF`);
-      return true;
-    }
-
-    // Default package: Recetas más famosas de la semana
-    const famous = getFamousWeeklyRecipes();
-    const targetRecipes = famous.slice(0, 7);
+  const exportWeeklyPlannerPdf = () => {
+    const targetRecipes = getFamousWeeklyRecipes();
     downloadRecipePackagePdf({
       packageName: 'Las Recetas Más Famosas de la Semana',
       description: 'Edición exclusiva con las preparaciones más aclamadas y votadas por la comunidad culinaria de Gusto.',
@@ -1506,8 +1464,8 @@ Gusto - Sistema de Gestión de Recetas.
     return true;
   };
 
-  const exportCollectionPackage = (collection: RecipeCollection) => {
-    exportRecipePackagePdf(collection);
+  const exportCollectionPackage = (collectionObj: RecipeCollection) => {
+    exportRecipePackagePdf(collectionObj);
   };
 
   return (
@@ -1522,6 +1480,7 @@ Gusto - Sistema de Gestión de Recetas.
         loginUser,
         loginUserWithPassword,
         quickLoginAsUser,
+        loginWithGoogle,
         registerUser,
         registerNewUser,
         updateUserRole,
@@ -1597,7 +1556,8 @@ Gusto - Sistema de Gestión de Recetas.
         exportRecipePackagePdf,
 
         toast,
-        showToast
+        showToast,
+        isFirebaseReady
       }}
     >
       {children}
