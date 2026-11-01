@@ -18,7 +18,6 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
     toggleDislikeRecipe,
     addRecipeIngredientsToCart,
     toggleWishlist,
-    toggleFeaturedRecipe,
   } = useApp();
 
   const [timeRange, setTimeRange] = useState<'day' | 'week' | 'month'>('week');
@@ -354,9 +353,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
         {podiumRecipes.map((recipe, index) => {
           const rank = index + 2;
           const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
-          const isInWish = currentUser ? currentUser.wishlistRecipeIds.includes(recipe.id) : false;
-          const isCardLiked = currentUser ? recipe.likedUserIds.includes(currentUser.id) : false;
-          const isCardDisliked = currentUser ? recipe.dislikedUserIds.includes(currentUser.id) : false;
+          const isInWish = currentUser.wishlistRecipeIds.includes(recipe.id);
 
           return (
             <article
@@ -434,7 +431,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                           toggleLikeRecipe(recipe.id);
                         }}
                         className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
-                          isCardLiked
+                          recipe.likedUserIds.includes(currentUser.id)
                             ? 'text-[#835500] font-bold'
                             : 'text-[#1B1C1C] hover:text-[#835500]'
                         }`}
@@ -442,7 +439,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                       >
                         <span
                           className="material-symbols-outlined text-[17px] text-[#835500]"
-                          style={isCardLiked ? { fontVariationSettings: "'FILL' 1" } : {}}
+                          style={recipe.likedUserIds.includes(currentUser.id) ? { fontVariationSettings: "'FILL' 1" } : {}}
                         >
                           thumb_up
                         </span>
@@ -455,7 +452,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                           toggleDislikeRecipe(recipe.id);
                         }}
                         className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                          isCardDisliked
+                          recipe.dislikedUserIds.includes(currentUser.id)
                             ? 'text-[#AB3333] font-bold'
                             : 'hover:text-[#AB3333]'
                         }`}
@@ -463,7 +460,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                       >
                         <span
                           className="material-symbols-outlined text-[16px]"
-                          style={isCardDisliked ? { fontVariationSettings: "'FILL' 1" } : {}}
+                          style={recipe.dislikedUserIds.includes(currentUser.id) ? { fontVariationSettings: "'FILL' 1" } : {}}
                         >
                           thumb_down
                         </span>

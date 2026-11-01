@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Recipe, Ingredient, Step, DietaryTag, RecipeStatus } from '../types';
 import { useApp } from '../context/AppContext';
 import {
@@ -14,8 +14,13 @@ import {
   Save,
   CheckCircle,
   AlertCircle,
-  Upload,
-  UserCheck
+  ShieldCheck,
+  FileEdit,
+  Lock,
+  UserCheck,
+  UserX,
+  Search,
+  Info
 } from 'lucide-react';
 
 interface RecipeEditorModalProps {
@@ -33,12 +38,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
 
   const [title, setTitle] = useState(recipeToEdit?.title || '');
   const [description, setDescription] = useState(recipeToEdit?.description || '');
-  
-  // Mandatory cover image: NO DEFAULT IMAGE ALLOWED
   const [coverImage, setCoverImage] = useState(recipeToEdit?.coverImage || '');
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [urlInputText, setUrlInputText] = useState('');
-
   const [prepTimeMin, setPrepTimeMin] = useState(recipeToEdit?.prepTimeMin || 20);
   const [cookTimeMin, setCookTimeMin] = useState(recipeToEdit?.cookTimeMin || 30);
   const [servings, setServings] = useState(recipeToEdit?.servings || 4);
@@ -46,18 +46,15 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   const [category, setCategory] = useState<Recipe['category']>(recipeToEdit?.category || 'platos_fuertes');
   const [tags, setTags] = useState<DietaryTag[]>(recipeToEdit?.tags || ['vegetariano']);
   const [videoUrl, setVideoUrl] = useState(recipeToEdit?.videoUrl || '');
-
-  // Collaborators management with autocomplete
-  const [coAuthorsList, setCoAuthorsList] = useState<string[]>(recipeToEdit?.coAuthors || []);
-  const [coAuthorInput, setCoAuthorInput] = useState('');
-  const [showUserSuggestions, setShowUserSuggestions] = useState(false);
+  const [coAuthorsText, setCoAuthorsText] = useState(recipeToEdit?.coAuthors?.join(', ') || '');
+  const [showCollaboratorSuggestions, setShowCollaboratorSuggestions] = useState(false);
   
   // Publication Status & Scheduling
   const [status, setStatus] = useState<RecipeStatus>(recipeToEdit?.status || 'published');
   const [scheduledDate, setScheduledDate] = useState(
     recipeToEdit?.scheduledPublishDate
       ? new Date(recipeToEdit.scheduledPublishDate).toISOString().slice(0, 16)
-      : new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16)
+      : new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16)
   );
 
   // Ingredients
@@ -77,7 +74,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       },
       {
         id: 'ing-custom-2',
-        name: 'Ajo fresco picado',
+        name: 'Ajo fresco triturado',
         quantity: 2,
         unit: 'dientes',
         estimatedPrice: 0.4,
@@ -116,56 +113,121 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   const [fatG, setFatG] = useState(recipeToEdit?.nutrition.fatG || 14);
   const [fiberG, setFiberG] = useState(recipeToEdit?.nutrition.fiberG || 5);
 
-  if (!isOpen) return null;
-
-  // Filter registered users for autocomplete excluding current user and already added
-  const matchingUsers = allUsers.filter((u) => {
-    if (currentUser && u.id === currentUser.id) return false;
-    if (coAuthorsList.includes(u.name)) return false;
-    if (!coAuthorInput.trim()) return false;
-    const query = coAuthorInput.toLowerCase();
-    return u.name.toLowerCase().includes(query) || u.username.toLowerCase().includes(query);
-  });
-
-  const handleAddCoAuthor = (nameToAdd: string) => {
-    const trimmed = nameToAdd.trim();
-    if (trimmed && !coAuthorsList.includes(trimmed)) {
-      setCoAuthorsList((prev) => [...prev, trimmed]);
-      setCoAuthorInput('');
-      setShowUserSuggestions(false);
-    }
-  };
-
-  const handleRemoveCoAuthor = (nameToRemove: string) => {
-    setCoAuthorsList((prev) => prev.filter((name) => name !== nameToRemove));
-  };
-
-  // Image Upload via File
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        showToast('La imagen es demasiado pesada. Elige una de hasta 5MB.');
-        return;
+  useEffect(() => {
+    if (isOpen) {
+      if (recipeToEdit) {
+        setTitle(recipeToEdit.title);
+        setDescription(recipeToEdit.description);
+        setCoverImage(recipeToEdit.coverImage);
+        setPrepTimeMin(recipeToEdit.prepTimeMin);
+        setCookTimeMin(recipeToEdit.cookTimeMin);
+        setServings(recipeToEdit.servings);
+        setDifficulty(recipeToEdit.difficulty);
+        setCategory(recipeToEdit.category);
+        setTags(recipeToEdit.tags || []);
+        setVideoUrl(recipeToEdit.videoUrl || '');
+        setCoAuthorsText(recipeToEdit.coAuthors?.join(', ') || '');
+        setStatus(recipeToEdit.status);
+        setScheduledDate(
+          recipeToEdit.scheduledPublishDate
+            ? new Date(recipeToEdit.scheduledPublishDate).toISOString().slice(0, 16)
+            : new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16)
+        );
+        setIngredients(
+          recipeToEdit.ingredients && recipeToEdit.ingredients.length > 0
+            ? recipeToEdit.ingredients.map(i => ({ ...i }))
+            : [
+                {
+                  id: `ing-${Date.now()}-1`,
+                  name: '',
+                  quantity: 1,
+                  unit: 'unidad',
+                  estimatedPrice: 1.0,
+                  storeName: 'Mercado Fresco Orgánico',
+                  storeLocation: 'Centro',
+                  inStock: true,
+                  stockLevel: 'alto',
+                  category: 'frescos'
+                }
+              ]
+        );
+        setSteps(
+          recipeToEdit.steps && recipeToEdit.steps.length > 0
+            ? recipeToEdit.steps.map(s => ({ ...s }))
+            : [
+                {
+                  stepNumber: 1,
+                  title: 'Preparación y mise en place',
+                  description: '',
+                  durationMinutes: 10
+                }
+              ]
+        );
+        setCalories(recipeToEdit.nutrition?.calories ?? 300);
+        setProteinG(recipeToEdit.nutrition?.proteinG ?? 10);
+        setCarbsG(recipeToEdit.nutrition?.carbsG ?? 30);
+        setFatG(recipeToEdit.nutrition?.fatG ?? 10);
+        setFiberG(recipeToEdit.nutrition?.fiberG ?? 4);
+      } else {
+        setTitle('');
+        setDescription('');
+        setCoverImage('');
+        setPrepTimeMin(20);
+        setCookTimeMin(30);
+        setServings(4);
+        setDifficulty('facil');
+        setCategory('platos_fuertes');
+        setTags(['vegetariano']);
+        setVideoUrl('');
+        setCoAuthorsText('');
+        setStatus('published');
+        setScheduledDate(new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16));
+        setIngredients([
+          {
+            id: `ing-${Date.now()}-1`,
+            name: 'Aceite de oliva virgen extra',
+            quantity: 30,
+            unit: 'ml',
+            estimatedPrice: 1.5,
+            storeName: 'Supermercado Central Gourmet',
+            storeLocation: 'Av. Libertador 880',
+            inStock: true,
+            stockLevel: 'alto',
+            category: 'frescos'
+          }
+        ]);
+        setSteps([
+          {
+            stepNumber: 1,
+            title: 'Preparación y mise en place',
+            description: '',
+            durationMinutes: 10
+          }
+        ]);
+        setCalories(320);
+        setProteinG(12);
+        setCarbsG(35);
+        setFatG(14);
+        setFiberG(5);
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setCoverImage(event.target.result as string);
-          showToast('Imagen cargada correctamente.');
-        }
-      };
-      reader.readAsDataURL(file);
     }
-  };
+  }, [isOpen, recipeToEdit]);
 
-  const handleApplyUrlImage = () => {
-    if (!urlInputText.trim()) return;
-    setCoverImage(urlInputText.trim());
-    setUrlInputText('');
-    setShowUrlInput(false);
-    showToast('Imagen por URL aplicada.');
-  };
+  // Permissions validation: author, co-authors, and staff (admin/editor)
+  const isAuthor = !recipeToEdit || recipeToEdit.authorId === currentUser.id;
+  const isCoAuthor = Boolean(
+    recipeToEdit?.coAuthors &&
+      recipeToEdit.coAuthors.some(
+        (ca) =>
+          ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+          ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
+          (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
+      )
+  );
+  const isStaff = currentUser.role === 'editor' || currentUser.role === 'admin';
+  const canEdit = isAuthor || isCoAuthor || isStaff;
+
+  if (!isOpen) return null;
 
   const toggleTag = (tag: DietaryTag) => {
     setTags((prev) =>
@@ -230,25 +292,25 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       showToast('Debes iniciar sesión para guardar o publicar una receta.');
       return;
     }
+
+    if (recipeToEdit && !canEdit) {
+      showToast('No tienes permisos suficientes para modificar esta receta.');
+      return;
+    }
+
     if (!title.trim()) {
       showToast('Por favor introduce un título para la receta.');
       return;
     }
-
-    // MANDATORY IMAGE VALIDATION
     if (!coverImage.trim()) {
-      showToast('Es obligatorio cargar una imagen propia para la receta.');
+      showToast('Debes proporcionar una imagen propia para la receta.');
       return;
     }
 
-    // Validate scheduled date if scheduling
-    if (status === 'scheduled') {
-      const scheduledTime = new Date(scheduledDate).getTime();
-      if (isNaN(scheduledTime)) {
-        showToast('Por favor selecciona una fecha y hora válida para programar la publicación.');
-        return;
-      }
-    }
+    const coAuthorsList = coAuthorsText
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
 
     const recipeData = {
       title: title.trim(),
@@ -279,38 +341,37 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
     };
 
     if (recipeToEdit) {
-      updateRecipe(recipeToEdit.id, recipeData);
+      const ok = updateRecipe(recipeToEdit.id, recipeData);
+      if (ok) {
+        onClose();
+      }
     } else {
       createRecipe(recipeData);
+      onClose();
     }
-
-    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs overflow-y-auto">
       <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="bg-[#e09f3e] px-6 py-4 text-white flex items-center justify-between sticky top-0 z-20">
+        <div className="bg-amber-600 px-6 py-4 text-white flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-2.5">
-            <span
-              className="material-symbols-outlined text-[26px] text-white"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              room_service
-            </span>
+            <Sparkles className="w-5 h-5 text-amber-200" />
             <div>
               <h2 className="font-bold text-lg leading-tight">
-                {recipeToEdit ? 'Editar Receta' : 'Creación de Nueva Receta'}
+                {recipeToEdit ? 'Editar Receta' : 'Nueva Creación Culinaria'}
               </h2>
               <p className="text-xs text-amber-100">
-                Estructura ingredientes, paso a paso, etiquetas dietéticas y programación
+                {recipeToEdit
+                  ? `Modificando "${recipeToEdit.title}" (${recipeToEdit.status === 'draft' ? 'Borrador' : recipeToEdit.status === 'scheduled' ? 'Programada' : 'Publicada'})`
+                  : 'Estructura ingredientes, paso a paso, etiquetas dietéticas y programación'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-white/80 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+            className="text-amber-200 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -318,11 +379,55 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
 
         {/* Scrollable Form */}
         <form onSubmit={handleSubmit} className="overflow-y-auto p-6 sm:p-8 space-y-6">
-          
-          {/* Top section: Basic info & Mandatory Cover Image */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Left column: Title, Description, Times */}
+          {/* Status & Permissions Notice Banner */}
+          {recipeToEdit && (
+            <div className="space-y-3">
+              {recipeToEdit.status === 'draft' ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
+                  <FileEdit className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                  <div className="text-xs text-emerald-900 leading-relaxed">
+                    <strong className="block text-emerald-950 font-bold mb-0.5">
+                      Borrador privado en edición
+                    </strong>
+                    Tienes total libertad para modificar todos los datos, ingredientes, tiempos y pasos. Puedes mantenerlo como borrador o publicarlo directamente en el catálogo cuando esté listo.
+                  </div>
+                </div>
+              ) : recipeToEdit.status === 'published' ? (
+                <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl flex items-start gap-3">
+                  <ShieldCheck className="w-5 h-5 text-sky-700 shrink-0 mt-0.5" />
+                  <div className="text-xs text-sky-900 leading-relaxed">
+                    <strong className="block text-sky-950 font-bold mb-0.5">
+                      Receta publicada en catálogo (Modificación sujeta a restricciones de integridad)
+                    </strong>
+                    Esta receta ya se encuentra visible en el catálogo gastronómico. Puedes actualizar y enriquecer la descripción, ingredientes, instrucciones y tiempos de cocción. Por integridad de la comunidad, el autor original, la fecha de publicación, los comentarios y las valoraciones se conservan intactos.
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+                  <Calendar className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-900 leading-relaxed">
+                    <strong className="block text-amber-950 font-bold mb-0.5">
+                      Receta programada en edición
+                    </strong>
+                    Puedes modificar los contenidos, pasos o ajustar la fecha y hora programada para su lanzamiento automático.
+                  </div>
+                </div>
+              )}
+
+              {!canEdit && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-800 text-xs">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold mb-0.5">Acceso restringido para edición</strong>
+                    No tienes autorización para modificar esta receta. Solo el autor principal, sus coautores registrados o el equipo editorial pueden realizar cambios.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
@@ -334,20 +439,20 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   placeholder="Ej. Tarta de Manzanas Caramelizadas Sin Gluten"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-sm font-semibold focus:ring-2 focus:ring-[#e09f3e] focus:outline-hidden"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Descripción o Historia de la Receta
+                  Descripción / Historia breve
                 </label>
                 <textarea
                   rows={3}
                   placeholder="Explica qué hace especial a este plato, texturas, aromas..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#e09f3e] focus:outline-hidden resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden resize-none"
                 />
               </div>
 
@@ -359,7 +464,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as Recipe['category'])}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-[#e09f3e] focus:outline-hidden capitalize"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden capitalize"
                   >
                     <option value="platos_fuertes">Platos Fuertes</option>
                     <option value="pastas">Pastas</option>
@@ -367,7 +472,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     <option value="ensaladas">Ensaladas & Bowls</option>
                     <option value="sopas">Sopas & Cremas</option>
                     <option value="postres">Postres & Dulces</option>
-                    <option value="desayunos">Desayunos & Bebidas</option>
+                    <option value="desayunos">Desayunos & Brunch</option>
                   </select>
                 </div>
 
@@ -378,7 +483,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value as Recipe['difficulty'])}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-[#e09f3e] focus:outline-hidden capitalize"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden capitalize"
                   >
                     <option value="facil">Fácil</option>
                     <option value="media">Media</option>
@@ -397,7 +502,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     min="1"
                     value={prepTimeMin}
                     onChange={(e) => setPrepTimeMin(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-[#e09f3e]"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
                 <div>
@@ -409,7 +514,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     min="0"
                     value={cookTimeMin}
                     onChange={(e) => setCookTimeMin(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-[#e09f3e]"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
                 <div>
@@ -421,260 +526,325 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     min="1"
                     value={servings}
                     onChange={(e) => setServings(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-[#e09f3e]"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Right column: MANDATORY Cover Image with Platform Icon Empty State */}
+            {/* Cover image & Co-authors */}
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1 flex items-center justify-between">
-                  <span>Foto de Portada (Obligatoria) *</span>
-                  {coverImage && (
-                    <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      Imagen seleccionada
-                    </span>
-                  )}
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                  Foto de Portada de la Receta *
                 </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    required
+                    value={coverImage}
+                    onChange={(e) => setCoverImage(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500"
+                    placeholder="https://..."
+                  />
+                  {coverImage && (
+                    <button
+                      type="button"
+                      onClick={() => setCoverImage('')}
+                      className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl text-xs font-semibold"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
 
-                {/* Cover Image Container */}
-                {!coverImage ? (
-                  /* EMPTY STATE WITH PLATFORM ICON AND REQUIRED TEXT */
-                  <div className="w-full h-56 rounded-2xl border-2 border-dashed border-stone-300 bg-stone-50 flex flex-col items-center justify-center text-center p-6 transition-all hover:bg-stone-100/70">
-                    <div className="w-16 h-16 rounded-full bg-[#ffddb9] flex items-center justify-center text-[#835500] mb-3 shadow-xs">
-                      <span
-                        className="material-symbols-outlined text-[34px]"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
-                      >
-                        room_service
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-stone-800">
+                {/* Image preview or empty placeholder */}
+                {!coverImage.trim() ? (
+                  <div className="mt-2 h-32 rounded-2xl bg-amber-50/50 border-2 border-dashed border-amber-300/80 flex flex-col items-center justify-center text-center p-3">
+                    <span
+                      className="material-symbols-outlined text-[#835500] text-[36px] mb-1"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      room_service
+                    </span>
+                    <span className="text-xs font-bold text-stone-800">
                       Aún no se ha seleccionado una imágen
-                    </h4>
-                    <p className="text-xs text-stone-500 mt-1 max-w-xs leading-relaxed">
-                      Para publicar la receta es obligatorio cargar una foto de tu plato.
-                    </p>
-
-                    <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
-                      <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#e09f3e] hover:bg-[#835500] text-white text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-2xs">
-                        <Upload className="w-4 h-4" />
-                        <span>Subir desde mi equipo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleImageFileUpload}
-                        />
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowUrlInput(!showUrlInput)}
-                        className="px-3.5 py-2 bg-white border border-stone-300 hover:bg-stone-100 text-stone-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
-                      >
-                        Ingresar enlace web
-                      </button>
-                    </div>
-
-                    {showUrlInput && (
-                      <div className="mt-3 flex gap-2 w-full max-w-xs">
-                        <input
-                          type="url"
-                          placeholder="https://images.unsplash.com/..."
-                          value={urlInputText}
-                          onChange={(e) => setUrlInputText(e.target.value)}
-                          className="flex-1 px-3 py-1.5 bg-white rounded-lg border border-stone-300 text-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleApplyUrlImage}
-                          className="px-3 py-1.5 bg-stone-900 text-white rounded-lg text-xs font-bold"
-                        >
-                          Usar
-                        </button>
-                      </div>
-                    )}
+                    </span>
+                    <span className="text-[10px] text-stone-500 mt-0.5">
+                      Ingresa una URL propia para visualizar la receta
+                    </span>
                   </div>
                 ) : (
-                  /* IMAGE PREVIEW WITH CHANGE / DELETE OPTIONS */
-                  <div className="space-y-2">
-                    <div className="relative h-56 rounded-2xl overflow-hidden border border-stone-200 shadow-inner group">
-                      <img
-                        src={coverImage}
-                        alt="Foto de la receta"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                        <label className="px-3 py-1.5 bg-white/90 hover:bg-white text-stone-900 rounded-xl text-xs font-bold cursor-pointer transition-colors">
-                          Cambiar imagen
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageFileUpload}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setCoverImage('')}
-                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center text-[11px] text-stone-500">
-                      <span>Foto asignada</span>
+                  <div className="mt-2 h-32 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 relative group">
+                    <img
+                      src={coverImage}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&auto=format&fit=crop&q=80';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button
                         type="button"
                         onClick={() => setCoverImage('')}
-                        className="text-red-600 hover:underline cursor-pointer"
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1 cursor-pointer"
                       >
-                        Quitar y seleccionar otra
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Quitar imagen</span>
                       </button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* CO-AUTHORS WITH AUTOCOMPLETE FROM ALL REGISTERED USERS */}
               <div className="relative">
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-[#e09f3e]" />
-                  <span>Añadir Colaboradores / Co-autores</span>
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-amber-600" />
+                    Co-autores y Colaboradores Registrados
+                  </span>
+                  <span className="text-[10px] text-stone-400 font-normal">
+                    Escribe @usuario para autocompletar
+                  </span>
                 </label>
 
-                {/* Display added co-author chips */}
-                {coAuthorsList.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {coAuthorsList.map((authorName) => (
-                      <span
-                        key={authorName}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#ffddb9] text-[#714500]"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" />
-                        <span>{authorName}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCoAuthor(authorName)}
-                          className="hover:text-red-700 cursor-pointer ml-1"
-                          title="Eliminar colaborador"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {/* Chips of currently added collaborators */}
+                {(() => {
+                  const currentTokens = coAuthorsText
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
 
-                {/* Input with autocomplete trigger */}
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="Escribe el nombre o alias (@usuario) para autocompletar..."
-                      value={coAuthorInput}
-                      onChange={(e) => {
-                        setCoAuthorInput(e.target.value);
-                        setShowUserSuggestions(true);
-                      }}
-                      onFocus={() => setShowUserSuggestions(true)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (matchingUsers.length > 0) {
-                            handleAddCoAuthor(matchingUsers[0].name);
-                          } else if (coAuthorInput.trim()) {
-                            handleAddCoAuthor(coAuthorInput);
-                          }
-                        }
-                      }}
-                      className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-[#e09f3e] focus:outline-hidden"
-                    />
+                  if (currentTokens.length === 0) return null;
 
-                    {/* Autocomplete suggestion dropdown */}
-                    {showUserSuggestions && coAuthorInput.trim().length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-2xl shadow-xl border border-stone-200 z-30 max-h-48 overflow-y-auto divide-y divide-stone-100">
-                        {matchingUsers.length > 0 ? (
-                          matchingUsers.map((user) => (
+                  return (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {currentTokens.map((token, idx) => {
+                        const cleanHandle = token.replace(/^@/, '').toLowerCase();
+                        const registeredUser = allUsers.find(
+                          (u) =>
+                            u.username.toLowerCase() === cleanHandle ||
+                            u.name.toLowerCase() === token.toLowerCase()
+                        );
+
+                        return (
+                          <span
+                            key={idx}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border shadow-2xs ${
+                              registeredUser
+                                ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                : 'bg-stone-100 text-stone-700 border-stone-200'
+                            }`}
+                          >
+                            {registeredUser ? (
+                              <img
+                                src={registeredUser.avatar}
+                                alt={registeredUser.name}
+                                className="w-4 h-4 rounded-full object-cover shrink-0"
+                              />
+                            ) : (
+                              <Users className="w-3 h-3 text-stone-500 shrink-0" />
+                            )}
+                            <span className="font-semibold">
+                              {registeredUser ? `@${registeredUser.username}` : token}
+                            </span>
+                            {registeredUser && (
+                              <span className="text-[10px] text-amber-700 font-normal hidden sm:inline">
+                                ({registeredUser.name})
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newTokens = currentTokens.filter((_, i) => i !== idx);
+                                setCoAuthorsText(newTokens.join(', ') + (newTokens.length > 0 ? ', ' : ''));
+                              }}
+                              className="ml-0.5 text-stone-400 hover:text-stone-700 cursor-pointer p-0.5"
+                              title="Quitar colaborador"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Ej. @juan, @lucianutri, @camicocina..."
+                    value={coAuthorsText}
+                    onFocus={() => setShowCollaboratorSuggestions(true)}
+                    onChange={(e) => {
+                      setCoAuthorsText(e.target.value);
+                      setShowCollaboratorSuggestions(true);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500 bg-white"
+                  />
+                  {coAuthorsText.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCollaboratorSuggestions(!showCollaboratorSuggestions)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-100 hover:bg-amber-100 cursor-pointer"
+                      title="Ver sugerencias de usuarios"
+                    >
+                      {showCollaboratorSuggestions ? 'Ocultar lista' : 'Ver lista'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete Dropdown List matching registered users (Max 7) */}
+                {(() => {
+                  if (!showCollaboratorSuggestions) return null;
+
+                  const rawLastToken = coAuthorsText.split(',').pop()?.trim() || '';
+                  const cleanQuery = rawLastToken.replace(/^@/, '').toLowerCase();
+
+                  // Find candidates excluding self
+                  const availableUsers = allUsers.filter((u) => u.id !== currentUser.id);
+
+                  let suggestions: typeof allUsers = [];
+                  let isFiltering = cleanQuery.length > 0;
+
+                  if (isFiltering) {
+                    // Match by username or name
+                    const matched = availableUsers.filter((u) => {
+                      const uUsername = u.username.toLowerCase();
+                      const uName = u.name.toLowerCase();
+                      return uUsername.includes(cleanQuery) || uName.includes(cleanQuery);
+                    });
+
+                    // Sort so users whose username/name starts with the query appear first
+                    matched.sort((a, b) => {
+                      const aUserStarts = a.username.toLowerCase().startsWith(cleanQuery);
+                      const bUserStarts = b.username.toLowerCase().startsWith(cleanQuery);
+                      if (aUserStarts && !bUserStarts) return -1;
+                      if (!aUserStarts && bUserStarts) return 1;
+                      return 0;
+                    });
+
+                    // RF: Maximum 7 users allowed in autocomplete list
+                    suggestions = matched.slice(0, 7);
+                  } else {
+                    // If focused but haven't typed or just placed comma, suggest up to 7 platform users
+                    suggestions = availableUsers.slice(0, 7);
+                  }
+
+                  return (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-2xl border border-stone-200 py-1.5 z-40 max-h-64 overflow-y-auto divide-y divide-stone-100">
+                      {/* Case 1: Search performed and NO matches found -> notify user */}
+                      {isFiltering && suggestions.length === 0 && (
+                        <div className="p-3 text-center bg-amber-50/70 border border-amber-200/80 rounded-xl m-1.5 text-stone-700">
+                          <div className="flex items-center justify-center gap-1.5 text-amber-800 font-bold text-xs">
+                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>No se encontraron coincidencias para "{rawLastToken}"</span>
+                          </div>
+                          <p className="text-[11px] text-stone-600 mt-1">
+                            No existe ningún usuario registrado con el alias o nombre <strong>"{rawLastToken}"</strong> en Gusto. Verifica que esté bien escrito o regístralo previamente.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Case 2: Suggestions found -> display max 7 users */}
+                      {suggestions.length > 0 && (
+                        <>
+                          <div className="px-3 py-1.5 bg-stone-50 flex items-center justify-between text-[10px] font-bold text-stone-500 uppercase tracking-wide">
+                            <span>
+                              {isFiltering
+                                ? `Usuarios encontrados (${suggestions.length} de máx. 7):`
+                                : `Usuarios sugeridos para colaborar (máx. 7):`}
+                            </span>
+                            <span className="text-[10px] text-amber-800 font-medium">
+                              Click para autocompletar
+                            </span>
+                          </div>
+
+                          {suggestions.map((user) => (
                             <button
                               key={user.id}
                               type="button"
-                              onClick={() => handleAddCoAuthor(user.name)}
-                              className="w-full px-3 py-2 text-left hover:bg-[#fff8f0] flex items-center gap-2.5 transition-colors cursor-pointer"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const parts = coAuthorsText.split(',');
+                                parts.pop();
+                                parts.push(`@${user.username}`);
+                                const updated = parts.map((p) => p.trim()).filter(Boolean).join(', ');
+                                setCoAuthorsText(updated ? updated + ', ' : '');
+                                setShowCollaboratorSuggestions(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-amber-50/80 flex items-center justify-between transition-colors cursor-pointer group"
                             >
-                              <img
-                                src={user.avatar}
-                                alt={user.name}
-                                className="w-7 h-7 rounded-full object-cover ring-1 ring-amber-300"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className="text-xs font-bold text-stone-800 truncate">
-                                  {user.name}
-                                </div>
-                                <div className="text-[10px] text-[#835500]">
-                                  @{user.username} • {user.role}
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <img
+                                  src={user.avatar}
+                                  alt={user.name}
+                                  className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-amber-400"
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs font-bold text-stone-900 group-hover:text-amber-800 truncate">
+                                      {user.name}
+                                    </span>
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-md font-semibold">
+                                      @{user.username}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-stone-400 truncate">
+                                    {user.specialties?.length ? user.specialties.slice(0, 2).join(' • ') : user.email}
+                                  </div>
                                 </div>
                               </div>
-                              <span className="text-[11px] font-bold text-[#e09f3e] shrink-0">
-                                Etiquetar +
+
+                              <span className="text-[11px] font-bold text-amber-800 bg-amber-100/70 group-hover:bg-amber-600 group-hover:text-white px-2.5 py-1 rounded-lg shrink-0 transition-colors ml-2">
+                                + Incluir
                               </span>
                             </button>
-                          ))
-                        ) : (
-                          <div className="p-3 text-xs text-stone-400 flex items-center justify-between">
-                            <span>No coincide con un chef registrado.</span>
-                            <button
-                              type="button"
-                              onClick={() => handleAddCoAuthor(coAuthorInput)}
-                              className="text-xs text-[#835500] font-bold hover:underline cursor-pointer"
-                            >
-                              Agregar como texto
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                          ))}
+                        </>
+                      )}
 
-                  <button
-                    type="button"
-                    onClick={() => handleAddCoAuthor(coAuthorInput)}
-                    className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0"
-                  >
-                    Añadir
-                  </button>
-                </div>
-                <p className="text-[10px] text-stone-400 mt-1">
-                  Reconoce la autoría compartida vinculando cuentas registradas en la comunidad.
+                      <div className="px-3 py-1 bg-stone-50 flex items-center justify-between text-[10px] text-stone-400 border-t border-stone-100">
+                        <span>Límite estricto: hasta 7 sugerencias simultáneas</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCollaboratorSuggestions(false)}
+                          className="text-stone-500 hover:text-stone-800 underline cursor-pointer"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <p className="text-[10px] text-stone-500 mt-1 flex items-center gap-1">
+                  <Info className="w-3 h-3 text-stone-400 shrink-0" />
+                  Al incluir un colaborador registrado (ej. @juan), este podrá visualizar y editar conjuntamente esta receta.
                 </p>
               </div>
 
-              {/* Video URL */}
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1 flex items-center gap-1.5">
                   <Video className="w-3.5 h-3.5 text-red-600" />
-                  <span>Video Explicativo YouTube / TikTok (Opcional)</span>
+                  Video Explicativo YouTube / TikTok (Premium)
                 </label>
                 <input
                   type="url"
                   placeholder="https://www.youtube.com/watch?v=..."
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-[#e09f3e] focus:outline-hidden"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500"
                 />
               </div>
-
             </div>
           </div>
 
           {/* Dietary Tags */}
-          <div className="p-4 rounded-2xl bg-[#ffddb9]/30 border border-[#e09f3e]/40">
-            <label className="block text-xs font-bold text-[#714500] uppercase mb-2">
+          <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80">
+            <label className="block text-xs font-bold text-amber-950 uppercase mb-2">
               Etiquetas Dietéticas y Alérgenos
             </label>
             <div className="flex flex-wrap gap-2">
@@ -693,10 +863,10 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => toggleTag(item.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                       isSelected
-                        ? 'bg-[#e09f3e] text-white border-[#e09f3e] shadow-2xs'
-                        : 'bg-white text-stone-700 border-amber-200 hover:bg-[#fff8f0]'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white text-stone-700 border-amber-200 hover:bg-amber-100/50'
                     }`}
                   >
                     {item.label}
@@ -711,16 +881,16 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wide">
-                  Ingredientes & Tiendas Vinculadas
+                  Ingredientes & Tiendas Asociadas
                 </h3>
                 <p className="text-xs text-stone-500">
-                  Cantidades, precios estimados y comercio para adquisición
+                  Especifica cantidades, precio estimado y tienda para compra directa
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddIngredient}
-                className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-bold transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Agregar Ingrediente
@@ -733,44 +903,44 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   key={ing.id}
                   className="grid grid-cols-12 gap-2 items-center p-2.5 rounded-xl bg-stone-50 border border-stone-200"
                 >
-                  <div className="col-span-4">
+                  <div className="col-span-4 sm:col-span-4">
                     <input
                       type="text"
                       required
                       placeholder="Nombre (ej. Harina de Almendras)"
                       value={ing.name}
                       onChange={(e) => handleUpdateIngredient(idx, 'name', e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs font-semibold focus:ring-1 focus:ring-[#e09f3e]"
+                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs font-semibold focus:ring-1 focus:ring-amber-500"
                     />
                   </div>
 
-                  <div className="col-span-2">
+                  <div className="col-span-2 sm:col-span-2">
                     <input
                       type="number"
                       min="0.1"
                       step="any"
-                      placeholder="Cant"
+                      placeholder="Cantidad"
                       value={ing.quantity}
                       onChange={(e) => handleUpdateIngredient(idx, 'quantity', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-[#e09f3e]"
+                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-amber-500"
                     />
                   </div>
 
-                  <div className="col-span-2">
+                  <div className="col-span-2 sm:col-span-2">
                     <input
                       type="text"
                       placeholder="Unidad (g, ml, u)"
                       value={ing.unit}
                       onChange={(e) => handleUpdateIngredient(idx, 'unit', e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-[#e09f3e]"
+                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-amber-500"
                     />
                   </div>
 
-                  <div className="col-span-3">
+                  <div className="col-span-3 sm:col-span-3">
                     <select
                       value={ing.storeName}
                       onChange={(e) => handleUpdateIngredient(idx, 'storeName', e.target.value)}
-                      className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-[11px] focus:ring-1 focus:ring-[#e09f3e] truncate"
+                      className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-[11px] focus:ring-1 focus:ring-amber-500 truncate"
                     >
                       <option value="Supermercado Central Gourmet">Supermercado Central</option>
                       <option value="Dietética El Trébol Verde">Dietética El Trébol</option>
@@ -784,7 +954,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                       type="button"
                       onClick={() => handleRemoveIngredient(idx)}
                       disabled={ingredients.length <= 1}
-                      className="p-1 text-stone-400 hover:text-red-600 disabled:opacity-30 cursor-pointer"
+                      className="p-1 text-stone-400 hover:text-red-600 disabled:opacity-30"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -802,13 +972,13 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   Paso a Paso de la Elaboración
                 </h3>
                 <p className="text-xs text-stone-500">
-                  Instrucciones detalladas con tiempos de preparación
+                  Desglosa la receta con instrucciones claras y tiempos
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddStep}
-                className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-bold transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Agregar Paso
@@ -819,7 +989,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
               {steps.map((step, idx) => (
                 <div key={idx} className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-[#e09f3e] text-white">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-600 text-white">
                       Paso {step.stepNumber}
                     </span>
                     <div className="flex items-center gap-2">
@@ -838,7 +1008,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                         type="button"
                         onClick={() => handleRemoveStep(idx)}
                         disabled={steps.length <= 1}
-                        className="p-1 text-stone-400 hover:text-red-600 disabled:opacity-30 cursor-pointer"
+                        className="p-1 text-stone-400 hover:text-red-600 disabled:opacity-30"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -851,7 +1021,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     placeholder="Título breve del paso (ej. Amasado y reposo)"
                     value={step.title}
                     onChange={(e) => handleUpdateStep(idx, 'title', e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white rounded-xl border border-stone-300 text-xs font-semibold focus:ring-1 focus:ring-[#e09f3e]"
+                    className="w-full px-3 py-1.5 bg-white rounded-xl border border-stone-300 text-xs font-semibold focus:ring-1 focus:ring-amber-500"
                   />
 
                   <textarea
@@ -860,7 +1030,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     placeholder="Instrucciones detalladas de este paso..."
                     value={step.description}
                     onChange={(e) => handleUpdateStep(idx, 'description', e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white rounded-xl border border-stone-300 text-xs focus:ring-1 focus:ring-[#e09f3e] resize-none"
+                    className="w-full px-3 py-1.5 bg-white rounded-xl border border-stone-300 text-xs focus:ring-1 focus:ring-amber-500 resize-none"
                   />
 
                   <input
@@ -868,7 +1038,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     placeholder="Consejo o truco opcional para el paso (ej. Humedece tus manos con agua)"
                     value={step.tip || ''}
                     onChange={(e) => handleUpdateStep(idx, 'tip', e.target.value)}
-                    className="w-full px-3 py-1 bg-amber-50/60 rounded-xl border border-amber-200/80 text-xs text-amber-900 focus:ring-1 focus:ring-[#e09f3e]"
+                    className="w-full px-3 py-1 bg-amber-50/60 rounded-xl border border-amber-200/80 text-xs text-amber-900 focus:ring-1 focus:ring-amber-500"
                   />
                 </div>
               ))}
@@ -929,108 +1099,121 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             </div>
           </div>
 
-          {/* PROGRAMMING & PUBLICATION: Draft vs Publish Now vs Schedule */}
-          <div className="p-5 rounded-2xl bg-[#fff8f0] border border-[#e09f3e]/40 space-y-3">
-            <h4 className="text-xs font-bold text-[#835500] uppercase flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-[#835500]" />
-              <span>Modalidad de Publicación & Programación</span>
+          {/* Publication Options: Draft vs Publish vs Schedule */}
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-3">
+            <h4 className="text-xs font-bold text-amber-950 uppercase flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-amber-700" />
+              Estado de Publicación & Programación
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <label
-                className={`flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition-all ${
-                  status === 'published'
-                    ? 'bg-[#e09f3e] text-white border-[#e09f3e] shadow-sm'
-                    : 'bg-white text-stone-700 border-amber-200 hover:bg-amber-50/50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="status"
-                  value="published"
-                  checked={status === 'published'}
-                  onChange={() => setStatus('published')}
-                  className="sr-only"
-                />
-                <CheckCircle className="w-4 h-4 shrink-0" />
-                <div className="text-xs">
-                  <div className="font-bold">Publicar Ahora</div>
-                  <div className={`text-[10px] ${status === 'published' ? 'text-amber-100' : 'text-stone-500'}`}>
-                    Visible en el catálogo público
-                  </div>
+            {recipeToEdit?.status === 'published' && !isStaff ? (
+              <div className="p-3.5 bg-white rounded-xl border border-amber-300 flex items-start gap-3">
+                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg shrink-0">
+                  <CheckCircle className="w-5 h-5" />
                 </div>
-              </label>
-
-              <label
-                className={`flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition-all ${
-                  status === 'draft'
-                    ? 'bg-[#e09f3e] text-white border-[#e09f3e] shadow-sm'
-                    : 'bg-white text-stone-700 border-amber-200 hover:bg-amber-50/50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="status"
-                  value="draft"
-                  checked={status === 'draft'}
-                  onChange={() => setStatus('draft')}
-                  className="sr-only"
-                />
-                <Save className="w-4 h-4 shrink-0" />
-                <div className="text-xs">
-                  <div className="font-bold">Guardar Borrador</div>
-                  <div className={`text-[10px] ${status === 'draft' ? 'text-amber-100' : 'text-stone-500'}`}>
-                    Privado en tu espacio personal
-                  </div>
-                </div>
-              </label>
-
-              <label
-                className={`flex items-center gap-2.5 p-3 rounded-2xl border cursor-pointer transition-all ${
-                  status === 'scheduled'
-                    ? 'bg-[#835500] text-white border-[#835500] shadow-sm'
-                    : 'bg-white text-stone-700 border-amber-200 hover:bg-amber-50/50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="status"
-                  value="scheduled"
-                  checked={status === 'scheduled'}
-                  onChange={() => setStatus('scheduled')}
-                  className="sr-only"
-                />
-                <Calendar className="w-4 h-4 shrink-0" />
-                <div className="text-xs">
-                  <div className="font-bold">Programar Lanzamiento</div>
-                  <div className={`text-[10px] ${status === 'scheduled' ? 'text-amber-100' : 'text-stone-500'}`}>
-                    Fecha y hora exacta
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            {/* Exact Date & Time Picker for Scheduled Publishing */}
-            {status === 'scheduled' && (
-              <div className="p-4 bg-white rounded-2xl border border-[#e09f3e] space-y-2 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <span className="text-xs font-bold text-stone-800 block">
-                      Fecha y Hora de Publicación Automática:
-                    </span>
-                    <span className="text-[11px] text-stone-500">
-                      El sistema publicará la receta automáticamente al alcanzar el momento programado.
+                <div className="text-xs space-y-1">
+                  <div className="font-bold text-stone-900 flex items-center gap-2">
+                    <span>Receta Publicada Activa en el Catálogo</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                      Publicada
                     </span>
                   </div>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
-                    className="px-3.5 py-2 rounded-xl border border-stone-300 text-xs font-semibold text-stone-900 focus:ring-2 focus:ring-[#e09f3e] focus:outline-hidden"
-                  />
+                  <p className="text-stone-600 leading-relaxed text-[11px]">
+                    Esta receta se encuentra pública y disponible para la comunidad. Al guardar las modificaciones, sus datos culinarios e ingredientes se actualizarán de forma inmediata en el catálogo, manteniendo protegida la autoría y las valoraciones de los usuarios.
+                  </p>
                 </div>
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label
+                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      status === 'published'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white text-stone-700 border-amber-200'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      value="published"
+                      checked={status === 'published'}
+                      onChange={() => setStatus('published')}
+                      className="sr-only"
+                    />
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    <div className="text-xs">
+                      <div className="font-bold">Publicar Ahora</div>
+                      <div className={`text-[10px] ${status === 'published' ? 'text-amber-100' : 'text-stone-500'}`}>
+                        Visible de inmediato
+                      </div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      status === 'draft'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white text-stone-700 border-amber-200'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      value="draft"
+                      checked={status === 'draft'}
+                      onChange={() => setStatus('draft')}
+                      className="sr-only"
+                    />
+                    <Save className="w-4 h-4 shrink-0" />
+                    <div className="text-xs">
+                      <div className="font-bold">Guardar Borrador</div>
+                      <div className={`text-[10px] ${status === 'draft' ? 'text-amber-100' : 'text-stone-500'}`}>
+                        {recipeToEdit?.status === 'draft' ? 'Continuar en borrador' : 'Solo visible para ti'}
+                      </div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      status === 'scheduled'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white text-stone-700 border-amber-200'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      value="scheduled"
+                      checked={status === 'scheduled'}
+                      onChange={() => setStatus('scheduled')}
+                      className="sr-only"
+                    />
+                    <Calendar className="w-4 h-4 shrink-0" />
+                    <div className="text-xs">
+                      <div className="font-bold">Programar Lanzamiento</div>
+                      <div className={`text-[10px] ${status === 'scheduled' ? 'text-amber-100' : 'text-stone-500'}`}>
+                        Fecha y hora exacta
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {status === 'scheduled' && (
+                  <div className="p-3 bg-white rounded-xl border border-amber-300 flex flex-col sm:flex-row items-center gap-3">
+                    <span className="text-xs font-bold text-stone-700 shrink-0">
+                      Fecha y Hora de Publicación Automática:
+                    </span>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={scheduledDate}
+                      onChange={(e) => setScheduledDate(e.target.value)}
+                      className="px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-semibold text-stone-800"
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -1045,10 +1228,20 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-[#e09f3e] hover:bg-[#835500] text-white text-xs sm:text-sm font-bold rounded-full shadow-md transition-colors flex items-center gap-2 cursor-pointer"
+              disabled={recipeToEdit ? !canEdit : false}
+              title={recipeToEdit && !canEdit ? 'Solo el autor o moderadores pueden guardar cambios' : undefined}
+              className={`px-6 py-2.5 text-white text-xs sm:text-sm font-bold rounded-full shadow-md transition-colors flex items-center gap-2 ${
+                recipeToEdit && !canEdit
+                  ? 'bg-stone-400 cursor-not-allowed opacity-60'
+                  : 'bg-[#E09F3E] hover:bg-[#835500] cursor-pointer'
+              }`}
             >
               <Save className="w-4 h-4" />
-              {recipeToEdit ? 'Guardar Cambios' : 'Confirmar y Guardar Receta'}
+              {recipeToEdit
+                ? recipeToEdit.status === 'draft'
+                  ? 'Guardar Modificaciones'
+                  : 'Guardar Cambios'
+                : 'Confirmar y Guardar Receta'}
             </button>
           </div>
         </form>

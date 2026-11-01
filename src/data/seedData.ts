@@ -1,20 +1,12 @@
-import {
-  UserProfile,
-  Recipe,
-  RecipeComment,
-  ForumTopic,
-  ForumReply,
-  ModerationReport,
-  AppNotification,
-  RecipeCollection,
-  UserAddress,
-  PurchaseOrder
-} from '../types';
+import { UserProfile, Recipe, RecipeComment, ForumTopic, ForumReply, ModerationReport, AppNotification, RecipeCollection } from '../types';
 
 export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'user-mateo',
     name: 'Mateo Rossi',
+    firstName: 'Mateo',
+    lastName: 'Rossi',
+    gender: 'Masculino',
     username: 'mateochef',
     email: 'mateo.rossi@gusto.app',
     password: 'password123',
@@ -36,78 +28,13 @@ export const INITIAL_USERS: UserProfile[] = [
     followingUserIds: ['user-lucia', 'user-camila'],
     pinnedRecipeId: 'rec-1',
     wishlistRecipeIds: ['rec-2', 'rec-4'],
-    preferredPostalCode: '1414',
-    preferredCity: 'CABA (Palermo / Colegiales)',
-    preferredStoreId: 'coto',
-    addresses: [
-      {
-        id: 'addr-mateo-1',
-        alias: 'Casa Principal',
-        street: 'Av. Santa Fe',
-        number: '3420',
-        apartment: '4B',
-        city: 'Palermo, CABA',
-        province: 'Ciudad Autónoma de Buenos Aires',
-        postalCode: '1414',
-        isDefault: true,
-        notes: 'Timbre 4B. Tocar timbre y dejar en recepción si no atiendo.',
-        createdAt: '2026-09-01T10:00:00.000Z'
-      },
-      {
-        id: 'addr-mateo-2',
-        alias: 'Taller de Cocina / Estudio',
-        street: 'Honduras',
-        number: '4810',
-        city: 'Palermo Soho, CABA',
-        province: 'Ciudad Autónoma de Buenos Aires',
-        postalCode: '1414',
-        isDefault: false,
-        notes: 'Portón negro. Taller gastronómico en PB.',
-        createdAt: '2026-09-15T14:30:00.000Z'
-      }
-    ],
-    wishlistIngredientItems: [
-      {
-        id: 'wish-ing-1',
-        ingredient: {
-          id: 'ing-5',
-          name: 'Pasta seca Penne Rigate certificada Sin TACC',
-          quantity: 400,
-          unit: 'g',
-          estimatedPrice: 3200,
-          storeName: 'Dietética & Molino San Jorge',
-          storeLocation: 'Av. Corrientes 1250, CABA',
-          inStock: true,
-          stockLevel: 'alto',
-          category: 'secos'
-        },
-        recipeId: 'rec-2',
-        recipeTitle: 'Pasta al Pesto Genovés Sin TACC (Apta Celíacos)',
-        addedAt: '2026-10-04T10:00:00.000Z'
-      },
-      {
-        id: 'wish-ing-2',
-        ingredient: {
-          id: 'ing-14',
-          name: 'Harina de Almendras extra fina',
-          quantity: 180,
-          unit: 'g',
-          estimatedPrice: 4200,
-          storeName: 'Dietética & Molino San Jorge',
-          storeLocation: 'Av. Corrientes 1250, CABA',
-          inStock: true,
-          stockLevel: 'alto',
-          category: 'secos'
-        },
-        recipeId: 'rec-4',
-        recipeTitle: 'Cheesecake Keto de Frutos Rojos (Sin Azúcar / Low Carb)',
-        addedAt: '2026-10-04T10:05:00.000Z'
-      }
-    ],
   },
   {
     id: 'user-lucia',
     name: 'Lucía Valenzuela',
+    firstName: 'Lucía',
+    lastName: 'Valenzuela',
+    gender: 'Femenino',
     username: 'lucianutri',
     email: 'lucia.valenzuela@gusto.app',
     password: 'password123',
@@ -129,29 +56,13 @@ export const INITIAL_USERS: UserProfile[] = [
     followingUserIds: ['user-mateo'],
     pinnedRecipeId: 'rec-2',
     wishlistRecipeIds: ['rec-1', 'rec-3'],
-    preferredPostalCode: '1428',
-    preferredCity: 'CABA (Belgrano / Núñez)',
-    preferredStoreId: 'jumbo',
-    addresses: [
-      {
-        id: 'addr-lucia-1',
-        alias: 'Departamento Belgrano',
-        street: 'Av. Cabildo',
-        number: '2150',
-        apartment: '8A',
-        city: 'Belgrano, CABA',
-        province: 'Ciudad Autónoma de Buenos Aires',
-        postalCode: '1428',
-        isDefault: true,
-        notes: 'Seguridad 24 hs en garita.',
-        createdAt: '2026-09-10T12:00:00.000Z'
-      }
-    ],
-    wishlistIngredientItems: []
   },
   {
     id: 'user-camila',
     name: 'Camila Ríos',
+    firstName: 'Camila',
+    lastName: 'Ríos',
+    gender: 'Femenino',
     username: 'camicocina',
     email: 'camila.rios@gusto.app',
     password: 'password123',
@@ -165,29 +76,13 @@ export const INITIAL_USERS: UserProfile[] = [
     followingUserIds: ['user-mateo', 'user-lucia'],
     pinnedRecipeId: undefined,
     wishlistRecipeIds: ['rec-3'],
-    preferredPostalCode: '5000',
-    preferredCity: 'Córdoba Capital',
-    preferredStoreId: 'vea',
-    addresses: [
-      {
-        id: 'addr-camila-1',
-        alias: 'Casa Córdoba',
-        street: 'Bv. Chacabuco',
-        number: '620',
-        apartment: '2D',
-        city: 'Nueva Córdoba',
-        province: 'Córdoba',
-        postalCode: '5000',
-        isDefault: true,
-        notes: 'Edificio Los Robles.',
-        createdAt: '2026-09-12T16:00:00.000Z'
-      }
-    ],
-    wishlistIngredientItems: []
   },
   {
     id: 'user-ignacio',
     name: 'Ignacio Gómez (Admin)',
+    firstName: 'Ignacio',
+    lastName: 'Gómez',
+    gender: 'Masculino',
     username: 'ignacioadmin',
     email: 'admin@gusto.app',
     password: 'password123',
@@ -200,25 +95,44 @@ export const INITIAL_USERS: UserProfile[] = [
     followersCount: 95,
     followingUserIds: [],
     wishlistRecipeIds: [],
-    preferredPostalCode: '1414',
-    preferredCity: 'CABA (Palermo / Colegiales)',
-    preferredStoreId: 'coto',
-    addresses: [
-      {
-        id: 'addr-ignacio-1',
-        alias: 'Oficina Central Gusto',
-        street: 'Av. Corrientes',
-        number: '1250',
-        apartment: 'Piso 10',
-        city: 'San Nicolás, CABA',
-        province: 'Ciudad Autónoma de Buenos Aires',
-        postalCode: '1001',
-        isDefault: true,
-        notes: 'Horario comercial 09:00 a 18:00 hs.',
-        createdAt: '2026-08-01T09:00:00.000Z'
-      }
-    ],
-    wishlistIngredientItems: []
+  },
+  {
+    id: 'user-juan',
+    name: 'Juan Pérez',
+    firstName: 'Juan',
+    lastName: 'Pérez',
+    gender: 'Masculino',
+    username: 'juan',
+    email: 'juan.perez@gusto.app',
+    password: 'password123',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80',
+    role: 'usuario',
+    bio: 'Cocinero casero apasionado por los asados tradicionales, pizzas a la leña y pastas frescas al dente.',
+    specialties: ['Parrilla criolla', 'Pastas al huevo', 'Salsas caseras'],
+    dietaryPreferences: [],
+    subprofiles: [],
+    followersCount: 310,
+    followingUserIds: ['user-mateo', 'user-lucia'],
+    wishlistRecipeIds: ['rec-1'],
+  },
+  {
+    id: 'user-julia',
+    name: 'Julia Domínguez',
+    firstName: 'Julia',
+    lastName: 'Domínguez',
+    gender: 'Femenino',
+    username: 'juliacocina',
+    email: 'julia.cocina@gusto.app',
+    password: 'password123',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=160&auto=format&fit=crop&q=80',
+    role: 'premium',
+    bio: 'Sommelier y creadora gastronómica con toques mediterráneos y maridajes gourmet.',
+    specialties: ['Maridajes', 'Cocina Mediterránea', 'Tapas'],
+    dietaryPreferences: ['vegetariano'],
+    subprofiles: [],
+    followersCount: 890,
+    followingUserIds: ['user-mateo'],
+    wishlistRecipeIds: ['rec-2'],
   }
 ];
 
@@ -263,12 +177,11 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Harina de Fuerza Orgánica 000',
         quantity: 500,
         unit: 'g',
-        estimatedPrice: 2450,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 2.10,
+        storeName: 'Molino & Cereal San Jorge',
+        storeLocation: 'Av. Corrientes 1250',
         inStock: true,
         stockLevel: 'alto',
-        suggestedSubstitute: 'Harina 0000 Tradicional',
         category: 'secos'
       },
       {
@@ -276,12 +189,11 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Masa Madre activa al 100% de hidratación',
         quantity: 100,
         unit: 'g',
-        estimatedPrice: 1950,
-        storeName: 'Coto Digital',
-        storeLocation: 'Sucursal Abasto - Av. Corrientes 3247, CABA',
+        estimatedPrice: 1.50,
+        storeName: 'Panadería Artesanal El Trigal',
+        storeLocation: 'Calle Palma 432',
         inStock: true,
         stockLevel: 'medio',
-        suggestedSubstitute: 'Levadura fresca prensada (15g)',
         category: 'frescos'
       },
       {
@@ -289,9 +201,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Agua filtrada a temperatura ambiente',
         quantity: 350,
         unit: 'ml',
-        estimatedPrice: 450,
-        storeName: 'Supermercados Dia',
-        storeLocation: 'Honduras 4100, CABA',
+        estimatedPrice: 0.10,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
         inStock: true,
         stockLevel: 'alto',
         category: 'otros'
@@ -301,9 +213,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Sal marina fina sin aditivos',
         quantity: 10,
         unit: 'g',
-        estimatedPrice: 650,
-        storeName: 'Jumbo a Casa',
-        storeLocation: 'Av. Int. Bullrich 345, CABA',
+        estimatedPrice: 0.80,
+        storeName: 'Dietética El Trébol Verde',
+        storeLocation: 'Calle Mayor 98',
         inStock: true,
         stockLevel: 'alto',
         category: 'especias'
@@ -381,12 +293,11 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Pasta seca Penne Rigate certificada Sin TACC',
         quantity: 400,
         unit: 'g',
-        estimatedPrice: 3200,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 3.20,
+        storeName: 'Dietética El Trébol Verde',
+        storeLocation: 'Calle Mayor 98',
         inStock: true,
         stockLevel: 'alto',
-        suggestedSubstitute: 'Fideos Fusilli de Arroz Sin TACC',
         category: 'secos'
       },
       {
@@ -394,12 +305,11 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Albahaca fresca de hojas anchas',
         quantity: 60,
         unit: 'g',
-        estimatedPrice: 1400,
-        storeName: 'Supermercados Dia',
-        storeLocation: 'Honduras 4100, CABA',
+        estimatedPrice: 1.40,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
         inStock: true,
         stockLevel: 'medio',
-        suggestedSubstitute: 'Rúcula fresca silvestre',
         category: 'frescos'
       },
       {
@@ -407,12 +317,12 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Piñones o nueces tostadas',
         quantity: 40,
         unit: 'g',
-        estimatedPrice: 2800,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 2.80,
+        storeName: 'Dietética El Trébol Verde',
+        storeLocation: 'Calle Mayor 98',
         inStock: true,
-        stockLevel: 'medio',
-        suggestedSubstitute: 'Nueces mariposa o almendras peladas',
+        stockLevel: 'bajo',
+        suggestedSubstitute: 'Nueces de Castilla o almendras peladas',
         category: 'secos'
       },
       {
@@ -420,12 +330,11 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Queso Parmigiano Reggiano rallado fino (sin gluten)',
         quantity: 70,
         unit: 'g',
-        estimatedPrice: 3900,
-        storeName: 'Jumbo a Casa',
-        storeLocation: 'Av. Int. Bullrich 345, CABA',
+        estimatedPrice: 3.90,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
         inStock: true,
         stockLevel: 'alto',
-        suggestedSubstitute: 'Queso Sardo estacionado',
         category: 'lacteos'
       },
       {
@@ -433,9 +342,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Aceite de Oliva Virgen Extra prensado en frío',
         quantity: 80,
         unit: 'ml',
-        estimatedPrice: 2500,
-        storeName: 'Coto Digital',
-        storeLocation: 'Sucursal Abasto - Av. Corrientes 3247, CABA',
+        estimatedPrice: 2.50,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
         inStock: true,
         stockLevel: 'alto',
         category: 'otros'
@@ -503,22 +412,21 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Tofu firme orgánico prensado',
         quantity: 250,
         unit: 'g',
-        estimatedPrice: 3100,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 3.10,
+        storeName: 'Dietética El Trébol Verde',
+        storeLocation: 'Calle Mayor 98',
         inStock: true,
         stockLevel: 'alto',
-        suggestedSubstitute: 'Tempeh orgánico o garbanzos asados',
         category: 'frescos'
       },
       {
         id: 'ing-11',
-        name: 'Palta Hass en su punto',
+        name: 'Aguacate Hass en su punto',
         quantity: 1,
         unit: 'unidad',
-        estimatedPrice: 1800,
-        storeName: 'Supermercados Dia',
-        storeLocation: 'Honduras 4100, CABA',
+        estimatedPrice: 1.80,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
         inStock: true,
         stockLevel: 'medio',
         category: 'frescos'
@@ -528,9 +436,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Pasta de Sésamo (Tahini puro)',
         quantity: 35,
         unit: 'g',
-        estimatedPrice: 2200,
-        storeName: 'Jumbo a Casa',
-        storeLocation: 'Av. Int. Bullrich 345, CABA',
+        estimatedPrice: 2.20,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
         inStock: true,
         stockLevel: 'alto',
         category: 'otros'
@@ -540,9 +448,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Espinacas baby y col lombarda rallada',
         quantity: 150,
         unit: 'g',
-        estimatedPrice: 1600,
-        storeName: 'Coto Digital',
-        storeLocation: 'Sucursal Abasto - Av. Corrientes 3247, CABA',
+        estimatedPrice: 1.60,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
         inStock: true,
         stockLevel: 'alto',
         category: 'frescos'
@@ -566,7 +474,7 @@ export const INITIAL_RECIPES: Recipe[] = [
       {
         stepNumber: 3,
         title: 'Montaje del bowl',
-        description: 'Disponer una base de espinacas baby, col lombarda morada, palta en abanico y los cubos de tofu tibios. Bañar con el aderezo y semillas de sésamo tostadas.',
+        description: 'Disponer una base de espinacas baby, col lombarda morada, aguacate en abanico y los cubos de tofu tibios. Bañar con el aderezo y semillas de sésamo tostadas.',
         durationMinutes: 5
       }
     ]
@@ -608,21 +516,21 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Harina de Almendras extra fina',
         quantity: 180,
         unit: 'g',
-        estimatedPrice: 4200,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 4.20,
+        storeName: 'Dietética El Trébol Verde',
+        storeLocation: 'Calle Mayor 98',
         inStock: true,
         stockLevel: 'alto',
         category: 'secos'
       },
       {
         id: 'ing-15',
-        name: 'Queso Crema entero estilo Casancrem / Finlandia',
+        name: 'Queso Crema entero estilo Philadelphia',
         quantity: 450,
         unit: 'g',
-        estimatedPrice: 3800,
-        storeName: 'Coto Digital',
-        storeLocation: 'Sucursal Abasto - Av. Corrientes 3247, CABA',
+        estimatedPrice: 3.80,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
         inStock: true,
         stockLevel: 'alto',
         category: 'lacteos'
@@ -632,9 +540,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Eritritol o Monkfruit en polvo',
         quantity: 90,
         unit: 'g',
-        estimatedPrice: 3500,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 3.50,
+        storeName: 'Dietética El Trébol Verde',
+        storeLocation: 'Calle Mayor 98',
         inStock: false,
         stockLevel: 'agotado',
         suggestedSubstitute: 'Stevia líquida pura concentrada o Xilitol',
@@ -642,15 +550,14 @@ export const INITIAL_RECIPES: Recipe[] = [
       },
       {
         id: 'ing-17',
-        name: 'Mix de Frutos Rojos frescos de la Patagonia',
+        name: 'Mix de Frutos Rojos silvestres frescos',
         quantity: 120,
         unit: 'g',
-        estimatedPrice: 2900,
-        storeName: 'Jumbo a Casa',
-        storeLocation: 'Av. Int. Bullrich 345, CABA',
+        estimatedPrice: 2.90,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
         inStock: true,
         stockLevel: 'medio',
-        suggestedSubstitute: 'Frutillas frescas seleccionadas',
         category: 'frescos'
       }
     ],
@@ -711,15 +618,14 @@ export const INITIAL_RECIPES: Recipe[] = [
     ingredients: [
       {
         id: 'ing-18',
-        name: 'Garbanzos cocidos seleccionados',
+        name: 'Garbanzos cocidos orgánicos',
         quantity: 400,
         unit: 'g',
-        estimatedPrice: 1800,
-        storeName: 'Coto Digital',
-        storeLocation: 'Sucursal Abasto - Av. Corrientes 3247, CABA',
+        estimatedPrice: 1.80,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
         inStock: true,
         stockLevel: 'alto',
-        suggestedSubstitute: 'Lentejas turcas o porotos negros',
         category: 'frescos'
       },
       {
@@ -727,9 +633,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Leche de Coco cremosa en lata',
         quantity: 400,
         unit: 'ml',
-        estimatedPrice: 2600,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 2.60,
+        storeName: 'Dietética El Trébol Verde',
+        storeLocation: 'Calle Mayor 98',
         inStock: true,
         stockLevel: 'alto',
         category: 'otros'
@@ -739,9 +645,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Calabaza Kabocha o Anco en cubos',
         quantity: 300,
         unit: 'g',
-        estimatedPrice: 1200,
-        storeName: 'Supermercados Dia',
-        storeLocation: 'Honduras 4100, CABA',
+        estimatedPrice: 1.20,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
         inStock: true,
         stockLevel: 'alto',
         category: 'frescos'
@@ -799,9 +705,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Harina 000 para panadería',
         quantity: 400,
         unit: 'g',
-        estimatedPrice: 1900,
-        storeName: 'Dietética & Molino San Jorge',
-        storeLocation: 'Av. Corrientes 1250, CABA',
+        estimatedPrice: 1.90,
+        storeName: 'Molino & Cereal San Jorge',
+        storeLocation: 'Av. Corrientes 1250',
         inStock: true,
         stockLevel: 'alto',
         category: 'secos'
@@ -811,9 +717,9 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Tomates cherry perita maduros',
         quantity: 150,
         unit: 'g',
-        estimatedPrice: 1500,
-        storeName: 'Supermercados Dia',
-        storeLocation: 'Honduras 4100, CABA',
+        estimatedPrice: 1.50,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
         inStock: true,
         stockLevel: 'alto',
         category: 'frescos'
@@ -870,12 +776,11 @@ export const INITIAL_RECIPES: Recipe[] = [
         name: 'Hongos Portobello frescos',
         quantity: 300,
         unit: 'g',
-        estimatedPrice: 3400,
-        storeName: 'Jumbo a Casa',
-        storeLocation: 'Av. Int. Bullrich 345, CABA',
+        estimatedPrice: 3.40,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
         inStock: true,
         stockLevel: 'medio',
-        suggestedSubstitute: 'Champiñones París frescos',
         category: 'frescos'
       }
     ],
@@ -885,6 +790,139 @@ export const INITIAL_RECIPES: Recipe[] = [
         title: 'Dorar hongos a fuego vivo',
         description: 'Saltear con manteca clarificada sin amontonar.',
         durationMinutes: 10
+      }
+    ]
+  },
+  {
+    id: 'rec-scheduled-1',
+    title: 'Focaccia Genovese con Romero y Aceitunas Kalamata',
+    description: 'Masa de alta hidratación fermentada lentamente en frío durante 48 horas con hoyuelos profundos de aceite de oliva virgen extra y sal marina en escamas.',
+    coverImage: 'https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80',
+    authorId: 'user-mateo',
+    authorName: 'Mateo Rossi',
+    authorAvatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&auto=format&fit=crop&q=80',
+    coAuthors: ['@lucianutri'],
+    status: 'scheduled',
+    scheduledPublishDate: '2026-11-15T18:00:00.000Z',
+    createdAt: '2026-10-20T10:00:00.000Z',
+    updatedAt: '2026-10-20T10:00:00.000Z',
+    prepTimeMin: 30,
+    cookTimeMin: 25,
+    servings: 6,
+    difficulty: 'media',
+    category: 'panaderia',
+    tags: ['vegetariano', 'vegano'],
+    isFeaturedMonth: false,
+    nutrition: { calories: 280, proteinG: 7, carbsG: 48, fatG: 8, fiberG: 3 },
+    likesCount: 0,
+    dislikesCount: 0,
+    likedUserIds: [],
+    dislikedUserIds: [],
+    commentsCount: 0,
+    ingredients: [
+      {
+        id: 'ing-foc-1',
+        name: 'Harina de fuerza W300',
+        quantity: 500,
+        unit: 'g',
+        estimatedPrice: 1.80,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'secos'
+      },
+      {
+        id: 'ing-foc-2',
+        name: 'Aceite de oliva virgen extra de cosecha temprana',
+        quantity: 60,
+        unit: 'ml',
+        estimatedPrice: 2.50,
+        storeName: 'Mercado Fresco Orgánico',
+        storeLocation: 'Paseo de la Ribera 45',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'frescos'
+      },
+      {
+        id: 'ing-foc-3',
+        name: 'Aceitunas Kalamata griegas descarozadas',
+        quantity: 100,
+        unit: 'g',
+        estimatedPrice: 2.10,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
+        inStock: true,
+        stockLevel: 'medio',
+        category: 'frescos'
+      }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: 'Amasado y primera fermentación en bloque',
+        description: 'Mezclar harina, 400ml de agua fría y sal marina. Desarrollar el gluten con pliegues cada 30 minutos.',
+        durationMinutes: 20,
+        tip: 'Mantener las manos ligeramente aceitadas para evitar que la masa se pegue.'
+      },
+      {
+        stepNumber: 2,
+        title: 'Volcado en bandeja y hoyuelos característicos',
+        description: 'Extender suavemente con los dedos formando hoyuelos profundos, bañar en salmuera con romero y aceitunas.',
+        durationMinutes: 10
+      },
+      {
+        stepNumber: 3,
+        title: 'Horneado a alta temperatura',
+        description: 'Hornear a 230°C con vapor durante 22-25 minutos hasta que la superficie quede dorada y crujiente.',
+        durationMinutes: 25
+      }
+    ]
+  },
+  {
+    id: 'rec-spam-example',
+    title: 'Receta Mágica Quemagrasas en 24 Horas sin Esfuerzo',
+    description: 'Píldoras y menjunje milagroso para acelerar el metabolismo sin ejercicio ni cambios dietéticos. Enlaces a suplementos dudosos.',
+    coverImage: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80',
+    authorId: 'user-fake-chef',
+    authorName: 'bot_suplementos99',
+    authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80',
+    coAuthors: [],
+    status: 'published',
+    createdAt: '2026-10-03T18:00:00.000Z',
+    updatedAt: '2026-10-03T18:00:00.000Z',
+    prepTimeMin: 5,
+    cookTimeMin: 0,
+    servings: 1,
+    difficulty: 'facil',
+    category: 'desayunos',
+    tags: ['bajo_sodio'],
+    nutrition: { calories: 50, proteinG: 0, carbsG: 1, fatG: 0, fiberG: 0 },
+    likesCount: 0,
+    dislikesCount: 15,
+    likedUserIds: [],
+    dislikedUserIds: ['user-mateo', 'user-lucia'],
+    commentsCount: 0,
+    ingredients: [
+      {
+        id: 'ing-spam-1',
+        name: 'Suplemento quemador no regulado',
+        quantity: 1,
+        unit: 'cucharada',
+        estimatedPrice: 45.0,
+        storeName: 'Enlace Externo Dudoso',
+        storeLocation: 'Sitio Web Desconocido',
+        inStock: false,
+        stockLevel: 'bajo',
+        category: 'otros'
+      }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: 'Mezcla y compra externa',
+        description: 'Ingerir en ayunas y seguir el link externo sospechoso para adquirir más frascos.',
+        durationMinutes: 5
       }
     ]
   }
@@ -899,8 +937,10 @@ export const INITIAL_COMMENTS: RecipeComment[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&auto=format&fit=crop&q=80',
     content: '¡Excelente técnica con la autólisis! Yo suelo reemplazar 50g con harina de centeno integral y el aroma que desprende es inigualable.',
     createdAt: '2026-09-16T14:20:00.000Z',
+    baseLikes: 12,
+    baseDislikes: 0,
     likes: 12,
-    likedUserIds: ['user-mateo', 'user-camila', 'user-ignacio'],
+    likedUserIds: [],
     dislikedUserIds: []
   },
   {
@@ -911,8 +951,10 @@ export const INITIAL_COMMENTS: RecipeComment[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&auto=format&fit=crop&q=80',
     content: '¡Gran aporte Lucía! El centeno además le da un empuje enzimático fenomenal a la masa.',
     createdAt: '2026-09-16T15:10:00.000Z',
-    likes: 8,
-    likedUserIds: ['user-lucia'],
+    baseLikes: 5,
+    baseDislikes: 0,
+    likes: 5,
+    likedUserIds: [],
     dislikedUserIds: [],
     parentCommentId: 'comm-1'
   },
@@ -924,8 +966,10 @@ export const INITIAL_COMMENTS: RecipeComment[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&auto=format&fit=crop&q=80',
     content: 'Nunca me quedaba el pesto tan brillante. El truco de enfriar el aceite de oliva antes de emulsionar cambió todo.',
     createdAt: '2026-09-29T18:45:00.000Z',
-    likes: 5,
-    likedUserIds: ['user-mateo'],
+    baseLikes: 8,
+    baseDislikes: 0,
+    likes: 8,
+    likedUserIds: [],
     dislikedUserIds: []
   }
 ];
@@ -944,7 +988,12 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
     repliesCount: 4,
     viewsCount: 310,
     tags: ['Masa Madre', 'Conservación', 'Pan Casero'],
-    isPinned: true
+    isPinned: true,
+    baseLikes: 24,
+    baseDislikes: 0,
+    likesCount: 24,
+    likedUserIds: [],
+    dislikedUserIds: []
   },
   {
     id: 'top-2',
@@ -959,7 +1008,12 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
     repliesCount: 8,
     viewsCount: 680,
     tags: ['Sin TACC', 'Celíacos', 'Técnicas Harinas'],
-    isPinned: true
+    isPinned: true,
+    baseLikes: 42,
+    baseDislikes: 0,
+    likesCount: 42,
+    likedUserIds: [],
+    dislikedUserIds: []
   },
   {
     id: 'top-3',
@@ -973,7 +1027,12 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
     createdAt: '2026-09-30T17:40:00.000Z',
     repliesCount: 5,
     viewsCount: 420,
-    tags: ['Dutch Oven', 'Equipamiento', 'Greñado']
+    tags: ['Dutch Oven', 'Equipamiento', 'Greñado'],
+    baseLikes: 18,
+    baseDislikes: 0,
+    likesCount: 18,
+    likedUserIds: [],
+    dislikedUserIds: []
   }
 ];
 
@@ -986,7 +1045,11 @@ export const INITIAL_FORUM_REPLIES: ForumReply[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=160&auto=format&fit=crop&q=80',
     content: '¡Para 15 días lo más seguro es hacer un refresco rígido (50% de hidratación en vez de 100%), meterlo bien al fondo de la nevera donde la temperatura es constante a 3-4°C. Al volver, con dos refrescos seguidos vuelve a duplicar en 4 horas!',
     createdAt: '2026-10-02T16:20:00.000Z',
+    baseLikes: 15,
+    baseDislikes: 0,
     likesCount: 15,
+    likedUserIds: [],
+    dislikedUserIds: [],
     isBestAnswer: true
   },
   {
@@ -997,7 +1060,11 @@ export const INITIAL_FORUM_REPLIES: ForumReply[] = [
     authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&auto=format&fit=crop&q=80',
     content: '¡Maravillosa explicación Lucía! Siempre tenía dudas de las proporciones exactas. ¿Cuánto porcentaje recomendás por kilo de mezcla de harinas sin gluten?',
     createdAt: '2026-09-25T14:30:00.000Z',
-    likesCount: 6
+    baseLikes: 6,
+    baseDislikes: 0,
+    likesCount: 6,
+    likedUserIds: [],
+    dislikedUserIds: []
   }
 ];
 
@@ -1027,6 +1094,19 @@ export const INITIAL_REPORTS: ModerationReport[] = [
     details: 'Suplantación de identidad de cocinero profesional publicando contenido obsceno en comentarios.',
     status: 'pending',
     createdAt: '2026-10-04T09:40:00.000Z'
+  },
+  {
+    id: 'rep-mod-3',
+    targetType: 'recipe',
+    targetId: 'rec-6',
+    targetTitleOrName: 'Curry Cremoso de Garbanzos y Calabaza Kabocha',
+    targetAuthorOrOwner: 'Mateo Rossi',
+    reporterId: 'user-camila',
+    reporterName: 'Camila Ríos',
+    reason: 'peligro_alimentario',
+    details: 'Advertencia sobre alérgenos no especificados con claridad en los ingredientes opcionales.',
+    status: 'pending',
+    createdAt: '2026-10-05T14:15:00.000Z'
   }
 ];
 
@@ -1082,159 +1162,3 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     type: 'moderation'
   }
 ];
-
-export const INITIAL_ORDERS: PurchaseOrder[] = [
-  {
-    id: 'ord-101',
-    userId: 'user-mateo',
-    orderNumber: '#GST-94821',
-    storeId: 'coto',
-    storeName: 'Coto Digital',
-    status: 'en_camino',
-    createdAt: '2026-10-04T11:20:00.000Z',
-    estimatedDeliveryTime: 'Hoy, entre 16:30 y 17:30 hs (A tiempo)',
-    deliveryAddress: {
-      id: 'addr-mateo-1',
-      alias: 'Casa Principal',
-      street: 'Av. Santa Fe',
-      number: '3420',
-      apartment: '4B',
-      city: 'Palermo, CABA',
-      province: 'Ciudad Autónoma de Buenos Aires',
-      postalCode: '1414',
-      isDefault: true,
-      notes: 'Timbre 4B. Tocar timbre y dejar en recepción si no atiendo.',
-      createdAt: '2026-09-01T10:00:00.000Z'
-    },
-    items: [
-      {
-        id: 'ord-item-1',
-        name: 'Harina de Fuerza Orgánica 000',
-        quantity: 500,
-        unit: 'g',
-        priceARS: 2450,
-        recipeTitle: 'Hogaza Rústica de Masa Madre',
-        storeName: 'Coto Digital'
-      },
-      {
-        id: 'ord-item-2',
-        name: 'Masa Madre activa al 100% de hidratación',
-        quantity: 100,
-        unit: 'g',
-        priceARS: 1950,
-        recipeTitle: 'Hogaza Rústica de Masa Madre',
-        storeName: 'Coto Digital'
-      },
-      {
-        id: 'ord-item-3',
-        name: 'Sal marina fina sin aditivos',
-        quantity: 10,
-        unit: 'g',
-        priceARS: 650,
-        recipeTitle: 'Hogaza Rústica de Masa Madre',
-        storeName: 'Coto Digital'
-      }
-    ],
-    subtotalARS: 5050,
-    deliveryFeeARS: 2850,
-    pantrySavingsARS: 450,
-    totalARS: 7900,
-    statusHistory: [
-      {
-        status: 'pendiente_pago',
-        timestamp: '2026-10-04T11:20:00.000Z',
-        note: 'Pago verificado con tarjeta de débito bancaria.'
-      },
-      {
-        status: 'en_preparacion',
-        timestamp: '2026-10-04T11:45:00.000Z',
-        note: 'Sucursal Coto Abasto comenzó el armado de la canasta de frescos y secos.'
-      },
-      {
-        status: 'despachado',
-        timestamp: '2026-10-04T14:10:00.000Z',
-        note: 'Pedido empaquetado y transferido al transportista de reparto.'
-      },
-      {
-        status: 'en_camino',
-        timestamp: '2026-10-04T15:00:00.000Z',
-        note: 'El repartidor está en ruta hacia Palermo (Av. Santa Fe 3420 4B).'
-      }
-    ]
-  },
-  {
-    id: 'ord-102',
-    userId: 'user-mateo',
-    orderNumber: '#GST-81204',
-    storeId: 'jumbo',
-    storeName: 'Jumbo a Casa',
-    status: 'entregado',
-    createdAt: '2026-09-28T09:15:00.000Z',
-    estimatedDeliveryTime: 'Entregado con éxito el 28 de Septiembre',
-    deliveryAddress: {
-      id: 'addr-mateo-1',
-      alias: 'Casa Principal',
-      street: 'Av. Santa Fe',
-      number: '3420',
-      apartment: '4B',
-      city: 'Palermo, CABA',
-      province: 'Ciudad Autónoma de Buenos Aires',
-      postalCode: '1414',
-      isDefault: true,
-      notes: 'Timbre 4B. Tocar timbre y dejar en recepción si no atiendo.',
-      createdAt: '2026-09-01T10:00:00.000Z'
-    },
-    items: [
-      {
-        id: 'ord-item-4',
-        name: 'Queso Parmigiano Reggiano rallado fino (sin gluten)',
-        quantity: 70,
-        unit: 'g',
-        priceARS: 3900,
-        recipeTitle: 'Pasta al Pesto Genovés Sin TACC',
-        storeName: 'Jumbo a Casa'
-      },
-      {
-        id: 'ord-item-5',
-        name: 'Mix de Frutos Rojos frescos de la Patagonia',
-        quantity: 120,
-        unit: 'g',
-        priceARS: 2900,
-        recipeTitle: 'Cheesecake Keto de Frutos Rojos',
-        storeName: 'Jumbo a Casa'
-      }
-    ],
-    subtotalARS: 6800,
-    deliveryFeeARS: 0,
-    pantrySavingsARS: 1200,
-    totalARS: 6800,
-    statusHistory: [
-      {
-        status: 'pendiente_pago',
-        timestamp: '2026-09-28T09:15:00.000Z',
-        note: 'Orden recibida y procesada.'
-      },
-      {
-        status: 'en_preparacion',
-        timestamp: '2026-09-28T09:40:00.000Z',
-        note: 'Selección de productos en cámara fría.'
-      },
-      {
-        status: 'despachado',
-        timestamp: '2026-09-28T11:10:00.000Z',
-        note: 'Despachado en camioneta refrigerada.'
-      },
-      {
-        status: 'en_camino',
-        timestamp: '2026-09-28T12:00:00.000Z',
-        note: 'Próxima parada: Palermo.'
-      },
-      {
-        status: 'entregado',
-        timestamp: '2026-09-28T12:45:00.000Z',
-        note: 'Entregado en mano en domicilio. Recepción firmada.'
-      }
-    ]
-  }
-];
-
