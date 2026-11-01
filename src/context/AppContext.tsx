@@ -184,13 +184,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved || 'user-mateo';
   });
 
+  const normalizeStoreName = (store?: string) => {
+    if (!store) return 'Coto Digital';
+    if (store.includes('Gourmet') || store.includes('Central Gourmet') || store.includes('San Jorge')) return 'Coto Digital';
+    if (store.includes('Trébol') || store.includes('Dietética')) return 'Jumbo Hipermercado';
+    if (store.includes('Orgánico') || store.includes('Fresco')) return 'Mercado Central';
+    if (store.includes('Trigal')) return 'Carrefour Market';
+    return store;
+  };
+
+  const normalizePrice = (price?: number) => {
+    if (typeof price !== 'number' || isNaN(price)) return 1500;
+    if (price > 0 && price < 100) {
+      return Math.round(price * 1200);
+    }
+    return price;
+  };
+
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.RECIPES);
     if (!saved) return INITIAL_RECIPES;
     try {
       const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return INITIAL_RECIPES;
-      return parsed;
+      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_RECIPES;
+      return parsed.map((rec: Recipe) => ({
+        ...rec,
+        ingredients: (rec.ingredients || []).map((ing) => ({
+          ...ing,
+          storeName: normalizeStoreName(ing.storeName),
+          estimatedPrice: normalizePrice(ing.estimatedPrice),
+        })),
+      }));
     } catch {
       return INITIAL_RECIPES;
     }
@@ -216,7 +240,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CART);
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((item: CartItem) => ({
+        ...item,
+        storeName: normalizeStoreName(item.storeName || item.ingredient?.storeName),
+        ingredient: {
+          ...item.ingredient,
+          storeName: normalizeStoreName(item.ingredient?.storeName),
+          estimatedPrice: normalizePrice(item.ingredient?.estimatedPrice),
+        },
+      }));
+    } catch {
+      return [];
+    }
   });
 
   const [reports, setReports] = useState<ModerationReport[]>(() => {

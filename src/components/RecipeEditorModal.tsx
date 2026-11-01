@@ -188,9 +188,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             name: 'Aceite de oliva virgen extra',
             quantity: 30,
             unit: 'ml',
-            estimatedPrice: 1.5,
-            storeName: 'Supermercado Central Gourmet',
-            storeLocation: 'Av. Libertador 880',
+            estimatedPrice: 2800,
+            storeName: 'Carrefour Market',
+            storeLocation: 'Av. Corrientes 3247, Abasto',
             inStock: true,
             stockLevel: 'alto',
             category: 'frescos'
@@ -241,9 +241,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       name: '',
       quantity: 1,
       unit: 'unidad',
-      estimatedPrice: 1.0,
-      storeName: 'Mercado Fresco Orgánico',
-      storeLocation: 'Centro',
+      estimatedPrice: 1500,
+      storeName: 'Coto Digital',
+      storeLocation: 'Sucursal Belgrano',
       inStock: true,
       stockLevel: 'alto',
       category: 'frescos'
@@ -940,12 +940,13 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     <select
                       value={ing.storeName}
                       onChange={(e) => handleUpdateIngredient(idx, 'storeName', e.target.value)}
-                      className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-[11px] focus:ring-1 focus:ring-amber-500 truncate"
+                      className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-[11px] font-semibold text-stone-800 focus:ring-1 focus:ring-amber-500 truncate"
                     >
-                      <option value="Supermercado Central Gourmet">Supermercado Central</option>
-                      <option value="Dietética El Trébol Verde">Dietética El Trébol</option>
-                      <option value="Mercado Fresco Orgánico">Mercado Fresco</option>
-                      <option value="Molino & Cereal San Jorge">Molino San Jorge</option>
+                      <option value="Coto Digital">Coto Digital</option>
+                      <option value="Carrefour Market">Carrefour Market</option>
+                      <option value="Jumbo Hipermercado">Jumbo Hipermercado</option>
+                      <option value="Supermercados Día">Supermercados Día</option>
+                      <option value="Mercado Central">Mercado Central</option>
                     </select>
                   </div>
 

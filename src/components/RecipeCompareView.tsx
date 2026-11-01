@@ -519,7 +519,7 @@ export const RecipeCompareView: React.FC<RecipeCompareViewProps> = ({
                       </span>
                       <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
                         <Store className="w-3 h-3" />
-                        ${totalCost.toFixed(2)} USD
+                        $ {totalCost.toLocaleString('es-AR')}
                       </span>
                     </div>
                     <div className="space-y-1 text-xs text-stone-600 max-h-48 overflow-y-auto pr-1">
@@ -532,7 +532,7 @@ export const RecipeCompareView: React.FC<RecipeCompareViewProps> = ({
                             {ing.quantity} {ing.unit} {ing.name}
                           </span>
                           <span className="shrink-0 font-medium text-stone-500">
-                            ${ing.estimatedPrice.toFixed(2)}
+                            $ {ing.estimatedPrice.toLocaleString('es-AR')}
                           </span>
                         </div>
                       ))}

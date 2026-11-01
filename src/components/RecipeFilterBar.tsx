@@ -132,19 +132,40 @@ export const RecipeFilterBar: React.FC<RecipeFilterBarProps> = ({
 
   return (
     <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_4px_24px_-4px_rgba(197,130,38,0.08)] mb-8 border border-stone-200/60 space-y-4">
-      {/* RF-16 Scope Switcher Pill Bar */}
+      {/* Scope Switcher: Mobile Dropdown & Desktop Pills */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1 border-b border-stone-100">
-        <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-[#FFDDB9] text-[#835500] flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[16px]">search</span>
-          </span>
-          <span className="text-xs font-bold text-stone-700">
-            Criterio de Búsqueda:
-          </span>
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-[#FFDDB9] text-[#835500] flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[16px]">search</span>
+            </span>
+            <span className="text-xs font-bold text-stone-700">
+              Criterio de Búsqueda:
+            </span>
+          </div>
+
+          {/* Mobile Dropdown Select */}
+          <div className="sm:hidden relative min-w-[170px]">
+            <select
+              value={searchScope}
+              onChange={(e) => setSearchScope(e.target.value as SearchScope)}
+              aria-label="Seleccionar criterio de búsqueda"
+              className="w-full px-3 py-1.5 pr-7 rounded-xl bg-stone-50 border border-stone-300 text-xs font-bold text-stone-800 focus:bg-white focus:ring-2 focus:ring-[#E09F3E] outline-none appearance-none cursor-pointer"
+            >
+              {SCOPE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <span className="material-symbols-outlined text-[18px] text-stone-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+              expand_more
+            </span>
+          </div>
         </div>
 
-        {/* Scope selector tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+        {/* Desktop Scope selector tabs (hidden on mobile) */}
+        <div className="hidden sm:flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
           {SCOPE_OPTIONS.map((opt) => {
             const isSelected = searchScope === opt.id;
             return (

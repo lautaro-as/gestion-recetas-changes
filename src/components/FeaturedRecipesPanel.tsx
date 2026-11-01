@@ -88,9 +88,69 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
         </div>
       </div>
 
-      {/* Filter Period Tabs Bar */}
+      {/* Filter Period & Criteria Bar */}
       <div className="w-full sticky top-16 z-30 bg-[#F3F3F3]/90 backdrop-blur-md py-1">
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-[#F6F3F2] p-1.5 rounded-full shadow-sm border border-stone-200/50">
+        {/* Mobile View: Two separated dropdown selects */}
+        <div className="md:hidden flex flex-col gap-2.5 bg-white p-3 rounded-2xl shadow-sm border border-stone-200/80">
+          {/* Dropdown 1: Período Temporal (Top del período) */}
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="mobile-time-range"
+              className="text-xs font-bold text-stone-700 flex items-center gap-1.5 shrink-0 w-24"
+            >
+              <span className="material-symbols-outlined text-[18px] text-[#E09F3E]">
+                calendar_month
+              </span>
+              <span>Período:</span>
+            </label>
+            <div className="relative flex-1">
+              <select
+                id="mobile-time-range"
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value as 'day' | 'week' | 'month')}
+                className="w-full px-3 py-2 pr-8 rounded-xl bg-stone-50 border border-stone-300 text-xs font-bold text-stone-800 focus:bg-white focus:ring-2 focus:ring-[#E09F3E] outline-none appearance-none cursor-pointer"
+              >
+                <option value="day">Top del Día</option>
+                <option value="week">Top de la Semana</option>
+                <option value="month">Top del Mes</option>
+              </select>
+              <span className="material-symbols-outlined text-[20px] text-stone-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                expand_more
+              </span>
+            </div>
+          </div>
+
+          {/* Dropdown 2: Criterio de Selección (Separado de Top) */}
+          <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
+            <label
+              htmlFor="mobile-filter-mode"
+              className="text-xs font-bold text-stone-700 flex items-center gap-1.5 shrink-0 w-24"
+            >
+              <span className="material-symbols-outlined text-[18px] text-[#E09F3E]">
+                tune
+              </span>
+              <span>Criterio:</span>
+            </label>
+            <div className="relative flex-1">
+              <select
+                id="mobile-filter-mode"
+                value={filterMode}
+                onChange={(e) => setFilterMode(e.target.value as 'all' | 'votes' | 'certified' | 'lowCal')}
+                className="w-full px-3 py-2 pr-8 rounded-xl bg-stone-50 border border-stone-300 text-xs font-bold text-stone-800 focus:bg-white focus:ring-2 focus:ring-[#E09F3E] outline-none appearance-none cursor-pointer"
+              >
+                <option value="all">Mayor Votación (Popularidad)</option>
+                <option value="certified">Chefs Certificados</option>
+                <option value="lowCal">Bajo en Calorías</option>
+              </select>
+              <span className="material-symbols-outlined text-[20px] text-stone-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                expand_more
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop View: Pill Bar */}
+        <div className="hidden md:flex flex-wrap items-center justify-between gap-3 bg-[#F6F3F2] p-1.5 rounded-full shadow-sm border border-stone-200/50">
           <div className="inline-flex items-center p-1 bg-[#E4E2E1] rounded-full">
             <button
               type="button"

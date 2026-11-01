@@ -693,7 +693,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </div>
 
-                {/* Quick actions: Cart & Notifications */}
+                {/* Quick actions: Shopping Cart */}
                 <div className="space-y-1 pt-2 border-t border-stone-100">
                   <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-3 pb-1">
                     Herramientas
@@ -711,32 +711,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span className="material-symbols-outlined text-[#835500] text-[22px]">
                         shopping_cart
                       </span>
-                      <span>Carrito de Compras</span>
+                      <span>Carrito de Ingredientes</span>
                     </div>
                     {cart.length > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#E09F3E] text-white">
                         {cart.length}
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      setShowNotifMenu(true);
-                    }}
-                    className="w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-all cursor-pointer"
-                    type="button"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
-                        notifications
-                      </span>
-                      <span>Notificaciones</span>
-                    </div>
-                    {unreadNotifs.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#FF8A84] text-white">
-                        {unreadNotifs.length}
                       </span>
                     )}
                   </button>

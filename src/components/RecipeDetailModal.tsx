@@ -598,8 +598,8 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
               <Store className="w-5 h-5 text-emerald-600 shrink-0" />
               <div>
                 <div className="text-[11px] font-semibold text-stone-500 uppercase">Costo Estimado</div>
-                <div className="text-sm font-bold text-emerald-700">~${totalIngredientsCost.toFixed(2)} USD</div>
-                <div className="text-[10px] text-stone-500">Tiendas locales</div>
+                <div className="text-sm font-bold text-emerald-700">~$ {totalIngredientsCost.toLocaleString('es-AR')}</div>
+                <div className="text-[10px] text-stone-500">Supermercados locales</div>
               </div>
             </div>
           </div>
@@ -687,7 +687,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
                               <Store className="w-3 h-3 text-stone-400" />
                               <span>{ing.storeName}</span>
                               <span>•</span>
-                              <span className="font-medium text-emerald-700">${ing.estimatedPrice.toFixed(2)}</span>
+                              <span className="font-medium text-emerald-700">$ {ing.estimatedPrice.toLocaleString('es-AR')}</span>
                             </div>
                           </div>
                         </div>
