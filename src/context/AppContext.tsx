@@ -13,8 +13,22 @@ import {
   Ingredient,
   SubProfile,
   DietaryTag,
-  RecipeStatus
+  ResetPasswordSimulation,
+  RecipeStatus,
+  WishlistIngredientItem,
+  CartItemSource,
+  UserAddress,
+  PurchaseOrder,
+  OrderItem,
+  OrderStatus
 } from '../types';
+import {
+  UserLocation,
+  PRESET_LOCATIONS,
+  PARTNER_STORES,
+  getStoreById
+} from '../data/storesData';
+import { formatARS } from '../utils/currency';
 import {
   INITIAL_USERS,
   INITIAL_RECIPES,
@@ -23,55 +37,87 @@ import {
   INITIAL_FORUM_REPLIES,
   INITIAL_REPORTS,
   INITIAL_COLLECTIONS,
-  INITIAL_NOTIFICATIONS
+  INITIAL_NOTIFICATIONS,
+  INITIAL_ORDERS
 } from '../data/seedData';
-import { downloadRecipePdf } from '../utils/recipePdfGenerator';
-import { downloadWeeklyPlannerPdf, downloadRecipePackagePdf } from '../utils/weeklyPlannerPdfGenerator';
 
 interface AppContextType {
   // Authentication & Users
-  isAuthenticated: boolean;
-  setIsAuthenticated: (val: boolean) => void;
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   allUsers: UserProfile[];
   switchUserRole: (role: UserRole) => void;
   selectSpecificUser: (userId: string) => void;
-  loginUser: (email: string) => boolean;
-  loginUserWithPassword: (email: string, password: string, remember30Days?: boolean) => { success: boolean; message: string };
-  quickLoginAsUser: (userId: string, remember30Days?: boolean) => void;
-  registerUser: (name: string, email: string, role: UserRole) => void;
-  registerNewUser: (params: {
-    firstName: string;
-    lastName: string;
+  loginUser: (email: string, password?: string) => { success: boolean; message: string };
+  registerUser: (userData: {
+    name: string;
+    username: string;
     email: string;
-    gender: string;
-    password: string;
+    password?: string;
+    role?: UserRole;
+    avatar?: string;
+    bio?: string;
+    specialties?: string[];
+    dietaryPreferences?: DietaryTag[];
+    location?: string;
+    address?: {
+      alias?: string;
+      street: string;
+      number: string;
+      apartment?: string;
+      city: string;
+      province: string;
+      postalCode: string;
+      notes?: string;
+    };
   }) => { success: boolean; message: string };
-  updateUserRole: (userId: string, newRole: UserRole) => void;
+  loginWithProvider: (provider: 'google' | 'apple') => void;
   logoutUser: () => void;
   updateUserProfile: (data: Partial<UserProfile>) => void;
   addSubProfile: (name: string, relation: string, dietaryRestrictions: DietaryTag[]) => void;
+  deleteSubProfile: (subProfileId: string) => void;
   switchActiveSubProfile: (subProfileId: string | null) => void;
-  requestPasswordReset: (email: string) => { success: boolean; message: string };
+
+  // Address Management
+  userAddresses: UserAddress[];
+  activeDeliveryAddress: UserAddress | null;
+  addUserAddress: (addressData: Omit<UserAddress, 'id' | 'createdAt'>) => UserAddress;
+  updateUserAddress: (addressId: string, addressData: Partial<UserAddress>) => void;
+  deleteUserAddress: (addressId: string) => void;
+  setDefaultAddress: (addressId: string) => void;
+
+  // Orders & Tracking
+  orders: PurchaseOrder[];
+  createOrderFromCart: (customAddress?: UserAddress) => PurchaseOrder | null;
+  advanceOrderStatus: (orderId: string) => void;
+  cancelOrder: (orderId: string) => void;
+  selectedOrderForTracking: PurchaseOrder | null;
+  setSelectedOrderForTracking: (order: PurchaseOrder | null) => void;
+  
+  // Password Recovery
+  resetSimulation: ResetPasswordSimulation | null;
+  requestPasswordReset: (email: string) => { success: boolean; message: string; simulation?: ResetPasswordSimulation };
+  resetPasswordWithToken: (tokenOrEmail: string, newPassword: string) => { success: boolean; message: string };
+  clearResetSimulation: () => void;
+
   followUserToggle: (targetUserId: string) => void;
   
   // Recipes
   recipes: Recipe[];
   createRecipe: (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'dislikesCount' | 'likedUserIds' | 'dislikedUserIds' | 'commentsCount'>) => string;
-  updateRecipe: (id: string, recipeData: Partial<Recipe>) => boolean;
+  updateRecipe: (id: string, recipeData: Partial<Recipe>) => void;
   deleteRecipe: (id: string) => boolean;
   togglePinRecipe: (recipeId: string) => void;
   toggleLikeRecipe: (recipeId: string) => void;
   toggleDislikeRecipe: (recipeId: string) => void;
   publishScheduledNow: (recipeId: string) => void;
-  changeRecipeStatus: (recipeId: string, newStatus: RecipeStatus, scheduledDate?: string) => void;
+  toggleFeaturedRecipe: (recipeId: string, timeframe: 'day' | 'week' | 'month') => void;
   
   // Comments
   comments: RecipeComment[];
   addComment: (recipeId: string, content: string, parentCommentId?: string) => void;
   editComment: (commentId: string, newContent: string) => void;
   deleteComment: (commentId: string) => void;
-  toggleCommentVote: (commentId: string, type: 'like' | 'dislike') => void;
+  voteComment: (commentId: string, type: 'like' | 'dislike') => void;
   
   // Recipe Comparison
   comparingRecipeIds: string[];
@@ -81,14 +127,27 @@ interface AppContextType {
   // Shopping Cart & Ingredients
   cart: CartItem[];
   addRecipeIngredientsToCart: (recipe: Recipe, selectedIngredientIds?: string[]) => void;
+  addMultipleRecipesToCart: (recipes: Recipe[]) => void;
   togglePantryItem: (cartItemId: string) => void;
+  updateCartItemQuantity: (cartItemId: string, newQuantity: number) => void;
+  updateCartItemStore: (cartItemId: string, newStoreIdOrName: string) => void;
+  applyCartItemSubstitute: (cartItemId: string, substituteName: string) => void;
   removeFromCart: (cartItemId: string) => void;
   clearCart: () => void;
   selectedStoreFilter: string;
   setSelectedStoreFilter: (store: string) => void;
+  userLocation: UserLocation;
+  setUserLocation: (location: UserLocation) => void;
+  preferredStoreId: string;
+  setPreferredStoreId: (storeId: string) => void;
 
   // Wishlist & Collections
   toggleWishlist: (recipeId: string) => void;
+  toggleWishlistIngredient: (ingredient: Ingredient, recipeId: string, recipeTitle: string) => void;
+  removeWishlistIngredient: (wishlistIngredientId: string) => void;
+  moveWishlistIngredientToCart: (wishlistIngredientId: string) => void;
+  moveCartItemToWishlist: (cartItemId: string) => void;
+  addAllWishlistIngredientsToCart: () => void;
   collections: RecipeCollection[];
   createCollection: (name: string, description: string, recipeIds: string[], isPrivate?: boolean) => void;
   toggleRecipeInCollection: (collectionId: string, recipeId: string) => void;
@@ -104,9 +163,6 @@ interface AppContextType {
   createForumTopic: (category: ForumTopic['category'], title: string, content: string, tags: string[]) => string;
   createForumReply: (topicId: string, content: string) => void;
   toggleForumReplyLike: (replyId: string) => void;
-  toggleForumReplyVote: (replyId: string, type: 'like' | 'dislike') => void;
-  editForumReply: (replyId: string, content: string) => void;
-  deleteForumReply: (replyId: string) => void;
   markBestAnswer: (replyId: string) => void;
 
   // Notifications
@@ -117,16 +173,9 @@ interface AppContextType {
   // Print & Export
   printableRecipe: Recipe | null;
   setPrintableRecipe: (recipe: Recipe | null) => void;
-  recipeToConfirmDownload: Recipe | null;
-  setRecipeToConfirmDownload: (recipe: Recipe | null) => void;
-  executeDownloadRecipePdf: (recipeOverride?: Recipe) => void;
-  exportRecipePdf: (recipe: Recipe) => void;
   exportRecipeJson: (recipe: Recipe) => void;
   exportRecipeText: (recipe: Recipe) => void;
   exportCollectionPackage: (collection: RecipeCollection) => void;
-  getFamousWeeklyRecipes: () => Recipe[];
-  exportWeeklyPlannerPdf: () => boolean;
-  exportRecipePackagePdf: (collection?: RecipeCollection) => boolean;
 
   // Toast System
   toast: string | null;
@@ -138,8 +187,6 @@ const AppContext = createContext<AppContextType | null>(null);
 const STORAGE_KEYS = {
   USERS: 'gusto_users_v1',
   CURRENT_USER_ID: 'gusto_current_user_id_v1',
-  REMEMBER_EXPIRES: 'gusto_remember_expires_v1',
-  IS_LOGGED_OUT: 'gusto_is_logged_out_v1',
   RECIPES: 'gusto_recipes_v1',
   COMMENTS: 'gusto_comments_v1',
   CART: 'gusto_cart_v1',
@@ -148,6 +195,7 @@ const STORAGE_KEYS = {
   TOPICS: 'gusto_topics_v1',
   REPLIES: 'gusto_replies_v1',
   NOTIFICATIONS: 'gusto_notifications_v1',
+  ORDERS: 'gusto_orders_v1',
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -157,61 +205,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_USERS;
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const explicitlyLoggedOut = localStorage.getItem(STORAGE_KEYS.IS_LOGGED_OUT) === 'true';
-    if (explicitlyLoggedOut) return false;
-
-    const savedId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-    if (!savedId) return false;
-
-    const expiresStr = localStorage.getItem(STORAGE_KEYS.REMEMBER_EXPIRES);
-    if (expiresStr) {
-      const exp = parseInt(expiresStr, 10);
-      if (Date.now() > exp) {
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-        localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
-        return false;
-      }
-    }
-    return true;
-  });
-
-  const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    const explicitlyLoggedOut = localStorage.getItem(STORAGE_KEYS.IS_LOGGED_OUT) === 'true';
-    if (explicitlyLoggedOut) return '';
-
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+    if (saved === 'logged_out') return null;
     return saved || 'user-mateo';
   });
 
+  const [orders, setOrders] = useState<PurchaseOrder[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.ORDERS);
+    return saved ? JSON.parse(saved) : INITIAL_ORDERS;
+  });
+
+  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<PurchaseOrder | null>(null);
+
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.RECIPES);
-    if (!saved) return INITIAL_RECIPES;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return INITIAL_RECIPES;
-      return parsed;
-    } catch {
-      return INITIAL_RECIPES;
-    }
+    return saved ? JSON.parse(saved) : INITIAL_RECIPES;
   });
 
   const [comments, setComments] = useState<RecipeComment[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.COMMENTS);
-    if (!saved) return INITIAL_COMMENTS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_COMMENTS;
-      return parsed.map((c: RecipeComment) => ({
-        ...c,
-        baseLikes: c.baseLikes ?? c.likes ?? 0,
-        baseDislikes: c.baseDislikes ?? 0,
-        likedUserIds: c.likedUserIds || [],
-        dislikedUserIds: c.dislikedUserIds || []
-      }));
-    } catch {
-      return INITIAL_COMMENTS;
-    }
+    return saved ? JSON.parse(saved) : INITIAL_COMMENTS;
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -221,14 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [reports, setReports] = useState<ModerationReport[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.REPORTS);
-    if (!saved) return INITIAL_REPORTS;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return INITIAL_REPORTS;
-      return parsed;
-    } catch {
-      return INITIAL_REPORTS;
-    }
+    return saved ? JSON.parse(saved) : INITIAL_REPORTS;
   });
 
   const [collections, setCollections] = useState<RecipeCollection[]>(() => {
@@ -243,20 +250,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [forumReplies, setForumReplies] = useState<ForumReply[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.REPLIES);
-    if (!saved) return INITIAL_FORUM_REPLIES;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_FORUM_REPLIES;
-      return parsed.map((r: ForumReply) => ({
-        ...r,
-        baseLikes: r.baseLikes ?? r.likesCount ?? 0,
-        baseDislikes: r.baseDislikes ?? 0,
-        likedUserIds: r.likedUserIds || [],
-        dislikedUserIds: r.dislikedUserIds || []
-      }));
-    } catch {
-      return INITIAL_FORUM_REPLIES;
-    }
+    return saved ? JSON.parse(saved) : INITIAL_FORUM_REPLIES;
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
@@ -266,9 +260,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [comparingRecipeIds, setComparingRecipeIds] = useState<string[]>([]);
   const [selectedStoreFilter, setSelectedStoreFilter] = useState<string>('Todas');
+  const [userLocation, setUserLocationState] = useState<UserLocation>(() => {
+    const saved = localStorage.getItem('gusto_user_location_v1');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+    }
+    return PRESET_LOCATIONS[0];
+  });
+  const [preferredStoreId, setPreferredStoreIdState] = useState<string>(() => {
+    return localStorage.getItem('gusto_pref_store_v1') || 'coto';
+  });
+
+  const setUserLocation = (loc: UserLocation) => {
+    setUserLocationState(loc);
+    localStorage.setItem('gusto_user_location_v1', JSON.stringify(loc));
+    showToast(`Ubicación actualizada: CP ${loc.postalCode} (${loc.cityName})`);
+  };
+
+  const setPreferredStoreId = (storeId: string) => {
+    setPreferredStoreIdState(storeId);
+    localStorage.setItem('gusto_pref_store_v1', storeId);
+    const store = getStoreById(storeId);
+    if (store) {
+      showToast(`Tienda preferida cambiada a ${store.name}`);
+    }
+  };
+
   const [printableRecipe, setPrintableRecipe] = useState<Recipe | null>(null);
-  const [recipeToConfirmDownload, setRecipeToConfirmDownload] = useState<Recipe | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Password reset simulation state
+  const [resetSimulation, setResetSimulation] = useState<ResetPasswordSimulation | null>(null);
 
   // Sync to local storage
   useEffect(() => {
@@ -276,8 +298,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    if (currentUserId) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    } else {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'logged_out');
+    }
   }, [currentUserId]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+  }, [orders]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipes));
@@ -311,51 +341,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
   }, [notifications]);
 
-  // Check scheduled recipes periodically and auto-publish when due
+  // Automatic scheduler: checks for recipes whose scheduled publish time has passed
   useEffect(() => {
     const checkScheduled = () => {
-      const now = Date.now();
-      let hasChanges = false;
-      const publishedList: Recipe[] = [];
-
-      setRecipes(prev => {
-        const next = prev.map(r => {
+      const nowIso = new Date().toISOString();
+      setRecipes((prev) => {
+        let changed = false;
+        const updated = prev.map((r) => {
           if (
             r.status === 'scheduled' &&
             r.scheduledPublishDate &&
-            new Date(r.scheduledPublishDate).getTime() <= now
+            new Date(r.scheduledPublishDate).getTime() <= Date.now()
           ) {
-            hasChanges = true;
-            const updated: Recipe = {
-              ...r,
-              status: 'published',
-              updatedAt: new Date().toISOString()
+            changed = true;
+            const notif: AppNotification = {
+              id: `notif-pub-${r.id}-${Date.now()}`,
+              userId: r.authorId,
+              title: 'Receta publicada automáticamente',
+              message: `Tu receta programada "${r.title}" ya ha alcanzado su horario y ha sido publicada con éxito.`,
+              createdAt: new Date().toISOString(),
+              read: false,
+              type: 'scheduled_published',
+              linkTarget: r.id,
             };
-            publishedList.push(updated);
-            return updated;
+            setNotifications((nPrev) => [notif, ...nPrev]);
+            return {
+              ...r,
+              status: 'published' as RecipeStatus,
+              updatedAt: nowIso,
+            };
           }
           return r;
         });
-        return hasChanges ? next : prev;
+        if (changed) {
+          return updated;
+        }
+        return prev;
       });
-
-      if (publishedList.length > 0) {
-        const newNotifs: AppNotification[] = publishedList.map(r => ({
-          id: `notif-sched-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          userId: r.authorId,
-          title: 'Receta programada publicada',
-          message: `Tu receta programada "${r.title}" ha sido publicada automáticamente en la comunidad.`,
-          createdAt: new Date().toISOString(),
-          read: false,
-          type: 'scheduled_published',
-          linkTarget: r.id
-        }));
-        setNotifications(prev => [...newNotifs, ...prev]);
-      }
     };
 
     checkScheduled();
-    const interval = setInterval(checkScheduled, 15000);
+    const interval = setInterval(checkScheduled, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -366,15 +392,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
   };
 
-  const currentUser = users.find(u => u.id === currentUserId) || users[0];
+  const currentUser = users.find(u => u.id === currentUserId) || null;
 
   // Role quick switch
   const switchUserRole = (role: UserRole) => {
     const targetUser = users.find(u => u.role === role);
     if (targetUser) {
       setCurrentUserId(targetUser.id);
-      setIsAuthenticated(true);
-      localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
       showToast(`Sesión cambiada a perfil: ${targetUser.name} (${targetUser.role.toUpperCase()})`);
     }
   };
@@ -383,179 +407,173 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const u = users.find(x => x.id === userId);
     if (u) {
       setCurrentUserId(u.id);
-      setIsAuthenticated(true);
-      localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
       showToast(`Sesión activa: ${u.name}`);
     }
   };
 
-  // 1-Click login for preloaded seeder accounts without password
-  const quickLoginAsUser = (userId: string, remember30Days = true) => {
-    const target = users.find(u => u.id === userId);
-    if (target) {
-      setCurrentUserId(target.id);
-      setIsAuthenticated(true);
-      localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
-
-      if (remember30Days) {
-        const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, target.id);
-        localStorage.setItem(STORAGE_KEYS.REMEMBER_EXPIRES, expiresAt.toString());
-      } else {
-        sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, target.id);
-        localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-      }
-      showToast(`¡Sesión iniciada con cuenta predeterminada: ${target.name}!`);
-    }
-  };
-
-  // Login with email and password with optional 30-day device remember
-  const loginUserWithPassword = (
-    email: string,
-    password: string,
-    remember30Days = false
-  ): { success: boolean; message: string } => {
+  const loginUser = (email: string, password?: string) => {
     const cleanEmail = email.trim().toLowerCase();
     const found = users.find(u => u.email.toLowerCase() === cleanEmail);
-
     if (!found) {
-      return {
-        success: false,
-        message: 'No existe ninguna cuenta registrada con este correo electrónico.'
-      };
+      showToast('Correo no registrado. Por favor verifica los datos o crea una cuenta nueva.');
+      return { success: false, message: 'Correo no registrado.' };
     }
-
-    if (found.password && found.password !== password) {
-      return {
-        success: false,
-        message: 'La contraseña ingresada no es válida. Por favor verifica tus credenciales.'
-      };
+    if (password && found.password && found.password !== password) {
+      showToast('Contraseña incorrecta. Puedes restablecerla con la opción de recuperación.');
+      return { success: false, message: 'Contraseña incorrecta.' };
     }
-
     setCurrentUserId(found.id);
-    setIsAuthenticated(true);
-    localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
-
-    if (remember30Days) {
-      const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, found.id);
-      localStorage.setItem(STORAGE_KEYS.REMEMBER_EXPIRES, expiresAt.toString());
-    } else {
-      sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, found.id);
-      localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-    }
-
     showToast(`¡Bienvenido de vuelta, ${found.name}!`);
-    return { success: true, message: `Sesión iniciada como ${found.name}` };
+    return { success: true, message: `Bienvenido, ${found.name}` };
   };
 
-  const loginUser = (email: string) => {
-    const res = loginUserWithPassword(email, 'password123', true);
-    return res.success;
-  };
-
-  // Register new user with firstName, lastName, email, gender, password and default role 'usuario'
-  const registerNewUser = (params: {
-    firstName: string;
-    lastName: string;
+  const registerUser = (userData: {
+    name: string;
+    username: string;
     email: string;
-    gender: string;
-    password: string;
-  }): { success: boolean; message: string } => {
-    const cleanEmail = params.email.trim().toLowerCase();
-    const cleanFirst = params.firstName.trim();
-    const cleanLast = params.lastName.trim();
+    password?: string;
+    role?: UserRole;
+    avatar?: string;
+    bio?: string;
+    specialties?: string[];
+    dietaryPreferences?: DietaryTag[];
+    location?: string;
+    address?: {
+      street: string;
+      number: string;
+      apartment?: string;
+      city: string;
+      province: string;
+      postalCode: string;
+      notes?: string;
+    };
+  }) => {
+    const cleanEmail = userData.email.trim().toLowerCase();
+    const cleanUsername = userData.username.trim().replace(/^@/, '').toLowerCase().replace(/\s+/g, '_');
 
-    if (!cleanFirst || !cleanLast || !cleanEmail || !params.password) {
-      return { success: false, message: 'Por favor completa todos los campos requeridos.' };
+    if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
+      showToast('Este correo electrónico ya está registrado. Inicia sesión directamente.');
+      return { success: false, message: 'El correo electrónico ya está registrado.' };
     }
 
-    const emailExists = users.some(u => u.email.toLowerCase() === cleanEmail);
-    if (emailExists) {
-      return {
-        success: false,
-        message: 'Ya existe una cuenta registrada con este correo electrónico. Por favor inicia sesión.'
-      };
+    if (users.some(u => u.username.toLowerCase() === cleanUsername)) {
+      showToast('Ese alias ya está en uso. Por favor elige otro diferente.');
+      return { success: false, message: 'El alias ya está en uso.' };
     }
 
-    const fullName = `${cleanFirst} ${cleanLast}`;
-    const cleanUsername = `${cleanFirst.toLowerCase().replace(/[^a-z0-9]/g, '')}_${cleanLast.toLowerCase().replace(/[^a-z0-9]/g, '')}` || `usuario_${Date.now()}`;
-
-    // Default avatar image uploaded by user
-    const avatar = '/assets/aistudio/default_avatar_b96d7689.jpg';
+    const initialAddresses: UserAddress[] = [];
+    if (userData.address && userData.address.street) {
+      initialAddresses.push({
+        id: `addr-${Date.now()}`,
+        alias: 'Principal',
+        street: userData.address.street.trim(),
+        number: userData.address.number.trim(),
+        apartment: userData.address.apartment?.trim(),
+        city: userData.address.city.trim() || 'CABA',
+        province: userData.address.province.trim() || 'Buenos Aires',
+        postalCode: userData.address.postalCode.trim() || '1414',
+        isDefault: true,
+        notes: userData.address.notes?.trim(),
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     const newUser: UserProfile = {
       id: `user-${Date.now()}`,
-      name: fullName,
-      firstName: cleanFirst,
-      lastName: cleanLast,
-      gender: params.gender,
-      username: cleanUsername,
+      name: userData.name.trim(),
+      username: cleanUsername || `chef_${Date.now().toString().slice(-4)}`,
       email: cleanEmail,
-      password: params.password,
-      avatar,
-      role: 'usuario', // Rol asignado por defecto: usuario
-      bio: 'Nuevo aficionado a la cocina y miembro activo de la comunidad Gusto.',
-      specialties: ['Cocina Casera'],
-      dietaryPreferences: [],
+      password: userData.password || 'password123',
+      avatar: userData.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80`,
+      role: userData.role || 'usuario',
+      bio: userData.bio?.trim() || 'Cocinero apasionado y nuevo miembro de la comunidad Gusto.',
+      specialties: userData.specialties && userData.specialties.length > 0 ? userData.specialties : ['Cocina Casera'],
+      dietaryPreferences: userData.dietaryPreferences || [],
       subprofiles: [],
+      addresses: initialAddresses,
       followersCount: 0,
       followingUserIds: ['user-mateo', 'user-lucia'],
       wishlistRecipeIds: [],
+      location: userData.address ? `${userData.address.city}, ${userData.address.province}` : (userData.location || 'Argentina'),
     };
 
-    setUsers(prev => [...prev, newUser]);
+    setUsers(prev => [newUser, ...prev]);
     setCurrentUserId(newUser.id);
-    setIsAuthenticated(true);
-    localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
-    sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUser.id);
 
-    showToast(`¡Cuenta creada con éxito! Bienvenido a Gusto, ${cleanFirst} (Rol: Usuario).`);
-    return { success: true, message: 'Usuario registrado con éxito.' };
-  };
-
-  const registerUser = (name: string, email: string, role: UserRole) => {
-    const parts = name.trim().split(' ');
-    const firstName = parts[0] || 'Usuario';
-    const lastName = parts.slice(1).join(' ') || 'Gusto';
-    registerNewUser({
-      firstName,
-      lastName,
-      email,
-      gender: 'Prefiero no decirlo',
-      password: 'password123'
-    });
-    if (role !== 'usuario') {
-      updateUserRole(currentUserId, role);
+    if (initialAddresses.length > 0) {
+      const addr = initialAddresses[0];
+      setUserLocation({
+        postalCode: addr.postalCode,
+        cityName: addr.city,
+        city: addr.city,
+        zone: addr.province,
+        province: addr.province,
+        address: `${addr.street} ${addr.number}${addr.apartment ? ' ' + addr.apartment : ''}`,
+      });
     }
+
+    showToast(`¡Cuenta creada con éxito! Bienvenido a Gusto, ${newUser.name}.`);
+    return { success: true, message: 'Cuenta creada con éxito.' };
   };
 
-  // Moderator / Admin role assignment
-  const updateUserRole = (userId: string, newRole: UserRole) => {
-    setUsers(prev => prev.map(u => (u.id === userId ? { ...u, role: newRole } : u)));
-    const targetUser = users.find(u => u.id === userId);
-    showToast(`Rol de ${targetUser?.name || 'usuario'} actualizado a ${newRole.toUpperCase()}.`);
+  const loginWithProvider = (provider: 'google' | 'apple') => {
+    const providerName = provider === 'google' ? 'Google' : 'Apple';
+    const email = provider === 'google' ? 'usuario.google@gusto.app' : 'usuario.apple@gusto.app';
+    let target = users.find(u => u.email.toLowerCase() === email);
+
+    if (!target) {
+      target = {
+        id: `user-${provider}-${Date.now()}`,
+        name: provider === 'google' ? 'Cocinero Google' : 'Chef Apple ID',
+        username: provider === 'google' ? 'google_chef' : 'apple_chef',
+        email,
+        password: 'oauth_secure_provider',
+        avatar: provider === 'google'
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80',
+        role: 'usuario',
+        bio: `Cuenta vinculada mediante inicio de sesión con ${providerName}.`,
+        specialties: ['Cocina Express', 'Sabor de Temporada'],
+        dietaryPreferences: [],
+        subprofiles: [],
+        addresses: [
+          {
+            id: `addr-${provider}-${Date.now()}`,
+            alias: 'Principal',
+            street: 'Av. Corrientes',
+            number: '1450',
+            city: 'CABA',
+            province: 'Buenos Aires',
+            postalCode: '1042',
+            isDefault: true,
+            createdAt: new Date().toISOString(),
+          }
+        ],
+        followersCount: 24,
+        followingUserIds: ['user-mateo'],
+        wishlistRecipeIds: [],
+        location: 'Buenos Aires, CABA',
+      };
+      setUsers(prev => [target!, ...prev]);
+    }
+    setCurrentUserId(target.id);
+    showToast(`Sesión iniciada exitosamente con ${providerName}.`);
   };
 
-  // Logout clears session, flags explicitly logged out, and redirects to auth landing page
   const logoutUser = () => {
-    setIsAuthenticated(false);
-    setCurrentUserId('');
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-    localStorage.removeItem(STORAGE_KEYS.REMEMBER_EXPIRES);
-    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-    localStorage.setItem(STORAGE_KEYS.IS_LOGGED_OUT, 'true');
+    setCurrentUserId(null);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'logged_out');
     showToast('Sesión cerrada correctamente. Hasta pronto.');
   };
 
   const updateUserProfile = (data: Partial<UserProfile>) => {
+    if (!currentUser) return;
     setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, ...data } : u));
     showToast('Perfil actualizado con éxito.');
   };
 
   const addSubProfile = (name: string, relation: string, dietaryRestrictions: DietaryTag[]) => {
+    if (!currentUser) return;
     const newSub: SubProfile = {
       id: `sub-${Date.now()}`,
       name,
@@ -572,10 +590,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return u;
     }));
-    showToast(`Subperfil familiar "${name}" agregado.`);
+    showToast(`Subperfil "${name}" agregado.`);
+  };
+
+  const deleteSubProfile = (subProfileId: string) => {
+    if (!currentUser) return;
+    setUsers(prev => prev.map(u => {
+      if (u.id === currentUser.id) {
+        return {
+          ...u,
+          subprofiles: u.subprofiles.filter(sp => sp.id !== subProfileId),
+          activeSubProfileId: u.activeSubProfileId === subProfileId ? null : u.activeSubProfileId
+        };
+      }
+      return u;
+    }));
+    showToast('Subperfil eliminado.');
   };
 
   const switchActiveSubProfile = (subProfileId: string | null) => {
+    if (!currentUser) return;
     setUsers(prev => prev.map(u => {
       if (u.id === currentUser.id) {
         return { ...u, activeSubProfileId: subProfileId };
@@ -590,14 +624,366 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Address management
+  const userAddresses: UserAddress[] = currentUser?.addresses || [];
+  const activeDeliveryAddress: UserAddress | null = userAddresses.find(a => a.isDefault) || userAddresses[0] || null;
+
+  const addUserAddress = (addressData: Omit<UserAddress, 'id' | 'createdAt'>): UserAddress => {
+    if (!currentUser) {
+      throw new Error('Debe iniciar sesión para agregar una dirección');
+    }
+    const newAddress: UserAddress = {
+      ...addressData,
+      id: `addr-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      isDefault: userAddresses.length === 0 ? true : !!addressData.isDefault,
+    };
+
+    setUsers(prev => prev.map(u => {
+      if (u.id === currentUser.id) {
+        const currentList = u.addresses || [];
+        const updatedList = newAddress.isDefault
+          ? currentList.map(a => ({ ...a, isDefault: false })).concat(newAddress)
+          : [...currentList, newAddress];
+        return { ...u, addresses: updatedList };
+      }
+      return u;
+    }));
+
+    if (newAddress.isDefault) {
+      setUserLocation({
+        postalCode: newAddress.postalCode,
+        cityName: newAddress.city,
+        city: newAddress.city,
+        zone: newAddress.province,
+        province: newAddress.province,
+        address: `${newAddress.street} ${newAddress.number}${newAddress.apartment ? ' ' + newAddress.apartment : ''}`,
+      });
+    }
+
+    showToast(`Dirección "${newAddress.alias || newAddress.street}" guardada exitosamente.`);
+    return newAddress;
+  };
+
+  const updateUserAddress = (addressId: string, addressData: Partial<UserAddress>) => {
+    if (!currentUser) return;
+    setUsers(prev => prev.map(u => {
+      if (u.id === currentUser.id) {
+        const currentList = u.addresses || [];
+        const isSettingDefault = addressData.isDefault;
+        const updatedList = currentList.map(a => {
+          if (a.id === addressId) {
+            return { ...a, ...addressData };
+          }
+          if (isSettingDefault) {
+            return { ...a, isDefault: false };
+          }
+          return a;
+        });
+        return { ...u, addresses: updatedList };
+      }
+      return u;
+    }));
+
+    if (addressData.isDefault || addressData.postalCode || addressData.city) {
+      const updated = (currentUser.addresses || []).find(a => a.id === addressId);
+      if (updated) {
+        const merged = { ...updated, ...addressData };
+        if (merged.isDefault) {
+          setUserLocation({
+            postalCode: merged.postalCode,
+            cityName: merged.city,
+            city: merged.city,
+            zone: merged.province,
+            province: merged.province,
+            address: `${merged.street} ${merged.number}${merged.apartment ? ' ' + merged.apartment : ''}`,
+          });
+        }
+      }
+    }
+    showToast('Dirección actualizada.');
+  };
+
+  const deleteUserAddress = (addressId: string) => {
+    if (!currentUser) return;
+    setUsers(prev => prev.map(u => {
+      if (u.id === currentUser.id) {
+        const currentList = u.addresses || [];
+        const remaining = currentList.filter(a => a.id !== addressId);
+        if (remaining.length > 0 && !remaining.some(a => a.isDefault)) {
+          remaining[0].isDefault = true;
+          setUserLocation({
+            postalCode: remaining[0].postalCode,
+            cityName: remaining[0].city,
+            city: remaining[0].city,
+            zone: remaining[0].province,
+            province: remaining[0].province,
+            address: `${remaining[0].street} ${remaining[0].number}`,
+          });
+        }
+        return { ...u, addresses: remaining };
+      }
+      return u;
+    }));
+    showToast('Dirección eliminada.');
+  };
+
+  const setDefaultAddress = (addressId: string) => {
+    if (!currentUser) return;
+    let targetAddr: UserAddress | undefined;
+    setUsers(prev => prev.map(u => {
+      if (u.id === currentUser.id) {
+        const currentList = u.addresses || [];
+        const updatedList = currentList.map(a => {
+          if (a.id === addressId) {
+            targetAddr = a;
+            return { ...a, isDefault: true };
+          }
+          return { ...a, isDefault: false };
+        });
+        return { ...u, addresses: updatedList };
+      }
+      return u;
+    }));
+
+    if (targetAddr) {
+      setUserLocation({
+        postalCode: targetAddr.postalCode,
+        cityName: targetAddr.city,
+        city: targetAddr.city,
+        zone: targetAddr.province,
+        province: targetAddr.province,
+        address: `${targetAddr.street} ${targetAddr.number}${targetAddr.apartment ? ' ' + targetAddr.apartment : ''}`,
+      });
+      showToast(`"${targetAddr.alias || targetAddr.street}" fijada como dirección predeterminada.`);
+    }
+  };
+
+  // Orders and Tracking
+  const createOrderFromCart = (customAddress?: UserAddress): PurchaseOrder | null => {
+    if (cart.length === 0) {
+      showToast('Tu carrito está vacío.');
+      return null;
+    }
+
+    const targetAddress: UserAddress = customAddress || activeDeliveryAddress || {
+      id: `addr-quick-${Date.now()}`,
+      alias: 'Dirección de Entrega',
+      street: userLocation.address?.split(' ')[0] || 'Av. Corrientes',
+      number: userLocation.address?.split(' ')[1] || '1234',
+      city: userLocation.cityName || userLocation.city || 'CABA',
+      province: userLocation.province || 'Buenos Aires',
+      postalCode: userLocation.postalCode || '1414',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    const store = getStoreById(preferredStoreId) || PARTNER_STORES[0];
+
+    const items: OrderItem[] = cart.map(c => {
+      const baseQty = c.ingredient.quantity > 0 ? c.ingredient.quantity : 1;
+      const ratio = c.quantityNeeded / baseQty;
+      const unitPrice = c.ingredient.estimatedPrice;
+      const itemSubtotal = Math.round(unitPrice * ratio);
+
+      return {
+        id: c.id,
+        name: c.ingredient.name,
+        quantity: c.quantityNeeded,
+        unit: c.ingredient.unit,
+        priceARS: unitPrice,
+        subtotalARS: itemSubtotal,
+        store: c.storeName || store.name,
+        recipeTitle: c.recipeTitle,
+        substituteUsed: c.substitutedBy,
+      };
+    });
+
+    const subtotalARS = items.reduce((sum, item) => sum + (item.subtotalARS || (item.priceARS * item.quantity)), 0);
+    const pantrySavingsARS = cart
+      .filter(c => c.haveInPantry)
+      .reduce((sum, c) => {
+        const baseQty = c.ingredient.quantity > 0 ? c.ingredient.quantity : 1;
+        const ratio = c.quantityNeeded / baseQty;
+        return sum + Math.round(c.ingredient.estimatedPrice * ratio);
+      }, 0);
+    const deliveryFeeARS = store.deliveryFeeARS || 2850;
+    const totalARS = Math.max(0, subtotalARS + deliveryFeeARS - pantrySavingsARS);
+
+    const estMinutes = 45 + Math.floor(Math.random() * 35);
+    const estTime = new Date(Date.now() + estMinutes * 60 * 1000).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    const newOrder: PurchaseOrder = {
+      id: `ord-${Date.now()}`,
+      userId: currentUser?.id || 'guest',
+      orderNumber: `#GST-${Math.floor(10000 + Math.random() * 90000)}`,
+      storeId: store.id,
+      storeName: store.name,
+      items,
+      subtotalARS,
+      deliveryFeeARS,
+      pantrySavingsARS,
+      totalARS,
+      status: 'en_preparacion',
+      deliveryAddress: targetAddress,
+      createdAt: new Date().toISOString(),
+      estimatedDeliveryTime: `Hoy, ${estTime} hs`,
+      statusHistory: [
+        {
+          status: 'pendiente_pago',
+          timestamp: new Date(Date.now() - 3 * 60 * 1000).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+          note: 'Orden recibida y validada por la pasarela de pagos',
+        },
+        {
+          status: 'en_preparacion',
+          timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+          note: `Empaquetando en sucursal ${store.name}`,
+        },
+      ],
+    };
+
+    setOrders(prev => [newOrder, ...prev]);
+    setSelectedOrderForTracking(newOrder);
+    setCart([]);
+    showToast(`¡Pedido ${newOrder.orderNumber} confirmado en ${store.name}! Puedes rastrearlo en tiempo real.`);
+    return newOrder;
+  };
+
+  const advanceOrderStatus = (orderId: string) => {
+    const nextStatusMap: Record<OrderStatus, OrderStatus | null> = {
+      pendiente_pago: 'en_preparacion',
+      en_preparacion: 'despachado',
+      despachado: 'en_camino',
+      en_camino: 'entregado',
+      entregado: null,
+      cancelado: null,
+    };
+
+    const statusNotes: Record<OrderStatus, string> = {
+      pendiente_pago: 'Pago en proceso',
+      en_preparacion: 'El supermercado comenzó la preparación de tus ingredientes',
+      despachado: 'Pedido armado y transferido al transportista express',
+      en_camino: 'El repartidor está en camino a tu domicilio',
+      entregado: '¡Pedido entregado con éxito! Que disfrutes cocinando',
+      cancelado: 'Pedido cancelado',
+    };
+
+    setOrders(prev => prev.map(ord => {
+      if (ord.id === orderId) {
+        const nextStatus = nextStatusMap[ord.status];
+        if (!nextStatus) return ord;
+        const updatedHistory = [
+          ...ord.statusHistory,
+          {
+            status: nextStatus,
+            timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+            note: statusNotes[nextStatus],
+          }
+        ];
+        const updatedOrder: PurchaseOrder = {
+          ...ord,
+          status: nextStatus,
+          statusHistory: updatedHistory,
+        };
+        if (selectedOrderForTracking?.id === orderId) {
+          setSelectedOrderForTracking(updatedOrder);
+        }
+        return updatedOrder;
+      }
+      return ord;
+    }));
+
+    showToast('Estado del pedido actualizado.');
+  };
+
+  const cancelOrder = (orderId: string) => {
+    setOrders(prev => prev.map(ord => {
+      if (ord.id === orderId) {
+        const updatedOrder: PurchaseOrder = {
+          ...ord,
+          status: 'cancelado',
+          statusHistory: [
+            ...ord.statusHistory,
+            {
+              status: 'cancelado',
+              timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+              note: 'Cancelación solicitada por el usuario',
+            }
+          ]
+        };
+        if (selectedOrderForTracking?.id === orderId) {
+          setSelectedOrderForTracking(updatedOrder);
+        }
+        return updatedOrder;
+      }
+      return ord;
+    }));
+    showToast('El pedido ha sido cancelado.');
+  };
+
   const requestPasswordReset = (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const foundUser = users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!foundUser) {
+      showToast('No encontramos ninguna cuenta con ese correo electrónico.');
+      return {
+        success: false,
+        message: 'No existe usuario registrado con ese correo.'
+      };
+    }
+
+    const token = 'GST-' + Math.floor(10000 + Math.random() * 90000);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const simulation: ResetPasswordSimulation = {
+      email: foundUser.email,
+      userName: foundUser.name,
+      token,
+      resetLink: `https://gusto.app/reset-password?token=${token}&email=${encodeURIComponent(foundUser.email)}`,
+      createdAt: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      expiresAt,
+      isUsed: false,
+    };
+    setResetSimulation(simulation);
+    showToast(`Código de restablecimiento ${token} generado para ${foundUser.name}.`);
     return {
       success: true,
-      message: `Enlace seguro de restablecimiento enviado a ${email}.`
+      message: `Código y enlace temporal generados con éxito.`,
+      simulation
     };
   };
 
+  const resetPasswordWithToken = (tokenOrEmail: string, newPassword: string) => {
+    const cleanInput = tokenOrEmail.trim().toLowerCase();
+    
+    // Check if token matches resetSimulation
+    let targetUser: UserProfile | undefined;
+    if (resetSimulation && resetSimulation.token.toLowerCase() === cleanInput) {
+      targetUser = users.find(u => u.email.toLowerCase() === resetSimulation.email.toLowerCase());
+    } else {
+      targetUser = users.find(u => u.email.toLowerCase() === cleanInput);
+    }
+
+    if (!targetUser) {
+      showToast('Error: Token de seguridad o correo inválido.');
+      return { success: false, message: 'Código de seguridad o correo inválido.' };
+    }
+
+    setUsers(prev => prev.map(u => u.id === targetUser!.id ? { ...u, password: newPassword } : u));
+    setResetSimulation(null);
+    setCurrentUserId(targetUser.id);
+    showToast('¡Contraseña actualizada con éxito! Has iniciado sesión automáticamente.');
+    return { success: true, message: 'Contraseña actualizada.' };
+  };
+
+  const clearResetSimulation = () => {
+    setResetSimulation(null);
+  };
+
   const followUserToggle = (targetUserId: string) => {
+    if (!currentUser) {
+      showToast('Por favor inicia sesión para seguir a otros creadores.');
+      return;
+    }
     const isFollowing = currentUser.followingUserIds.includes(targetUserId);
     setUsers(prev => prev.map(u => {
       if (u.id === currentUser.id) {
@@ -616,7 +1002,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
     
     if (!isFollowing) {
-      // Add notification to target user
       const targetUser = users.find(u => u.id === targetUserId);
       if (targetUser) {
         const notif: AppNotification = {
@@ -638,6 +1023,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Recipe Operations
   const createRecipe = (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'likesCount' | 'dislikesCount' | 'likedUserIds' | 'dislikedUserIds' | 'commentsCount'>) => {
+    if (!currentUser) {
+      showToast('Debes iniciar sesión para publicar una receta.');
+      return '';
+    }
     const newId = `rec-${Date.now()}`;
     const newRecipe: Recipe = {
       ...recipeData,
@@ -655,161 +1044,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newRecipe.status === 'scheduled') {
       showToast(`Receta "${newRecipe.title}" programada para el ${new Date(newRecipe.scheduledPublishDate || '').toLocaleDateString('es-ES')}.`);
     } else if (newRecipe.status === 'draft') {
-      showToast(`Borrador de "${newRecipe.title}" guardado en tu perfil personal.`);
+      showToast(`Borrador de "${newRecipe.title}" guardado en tu espacio personal.`);
     } else {
       showToast(`¡Receta "${newRecipe.title}" publicada en la comunidad!`);
     }
     return newId;
   };
 
-  const updateRecipe = (id: string, recipeData: Partial<Recipe>): boolean => {
-    const target = recipes.find(r => r.id === id);
-    if (!target) {
-      showToast('La receta que intentas modificar no existe o ha sido eliminada.');
-      return false;
-    }
-
-    // Permission validation: author, co-author, editor, or admin
-    const isAuthor = target.authorId === currentUser.id;
-    const isCoAuthor = Boolean(target.coAuthors && target.coAuthors.some(ca =>
-      ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
-      ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
-      (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
-    ));
-    const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
-    const canEdit = isAuthor || isCoAuthor || isStaff;
-
-    if (!canEdit) {
-      showToast('No tienes permisos suficientes para modificar esta receta.');
-      return false;
-    }
-
-    // Status & integrity restrictions
-    let sanitizedData = { ...recipeData };
-
-    if (target.status === 'published') {
-      // Published recipe restrictions:
-      // Preserve original author identity, publication timestamp, and community metrics
-      sanitizedData = {
-        ...sanitizedData,
-        authorId: target.authorId,
-        authorName: target.authorName,
-        authorAvatar: target.authorAvatar,
-        createdAt: target.createdAt,
-        likesCount: target.likesCount,
-        dislikesCount: target.dislikesCount,
-        likedUserIds: target.likedUserIds,
-        dislikedUserIds: target.dislikedUserIds,
-        commentsCount: target.commentsCount,
-        // Published recipes maintain published status unless staff explicitly changes it
-        status: isStaff && sanitizedData.status ? sanitizedData.status : 'published'
-      };
-    }
-
-    setRecipes(prev => prev.map(r => r.id === id ? {
-      ...r,
-      ...sanitizedData,
-      updatedAt: new Date().toISOString()
-    } : r));
-
-    if (target.status === 'draft') {
-      if (sanitizedData.status === 'published') {
-        showToast(`¡Borrador "${sanitizedData.title || target.title}" publicado con éxito en el catálogo!`);
-      } else if (sanitizedData.status === 'scheduled') {
-        showToast(`Borrador "${sanitizedData.title || target.title}" programado para publicación automática.`);
-      } else {
-        showToast(`Borrador "${sanitizedData.title || target.title}" guardado correctamente.`);
-      }
-    } else {
-      showToast(`Receta "${sanitizedData.title || target.title}" actualizada correctamente.`);
-    }
-
-    return true;
+  const updateRecipe = (id: string, recipeData: Partial<Recipe>) => {
+    setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...recipeData, updatedAt: new Date().toISOString() } : r));
+    showToast('Receta actualizada correctamente.');
   };
 
   const deleteRecipe = (id: string) => {
     const target = recipes.find(r => r.id === id);
-    if (!target) {
-      showToast('La receta solicitada no existe o ya ha sido eliminada.');
+    if (!target) return false;
+
+    if (!currentUser) {
+      showToast('Debes iniciar sesión para gestionar recetas.');
       return false;
     }
 
-    // Check permissions: author, editor, or admin
     const canDelete = currentUser.role === 'admin' || currentUser.role === 'editor' || target.authorId === currentUser.id;
     if (!canDelete) {
       showToast('No tienes permisos suficientes para eliminar esta receta.');
       return false;
     }
 
-    // 1. Remove recipe from state
     setRecipes(prev => prev.filter(r => r.id !== id));
-    // 2. Remove ingredients from shopping cart
     setCart(prev => prev.filter(c => c.recipeId !== id));
-    // 3. Remove from compare list
     setComparingRecipeIds(prev => prev.filter(cid => cid !== id));
-    // 4. Remove comments belonging to this recipe
-    setComments(prev => prev.filter(c => c.recipeId !== id));
-    // 5. Remove from collections
-    setCollections(prev => prev.map(col => ({
-      ...col,
-      recipeIds: col.recipeIds.filter(rid => rid !== id)
-    })));
-    // 6. Remove from users' pinned recipe and wishlists
-    setUsers(prev => prev.map(u => ({
-      ...u,
-      pinnedRecipeId: u.pinnedRecipeId === id ? undefined : u.pinnedRecipeId,
-      wishlistRecipeIds: u.wishlistRecipeIds.filter(wid => wid !== id)
-    })));
-    // 7. Clear printable recipe if it's the deleted one
-    setPrintableRecipe(prev => prev?.id === id ? null : prev);
-    // 8. Update any pending moderation reports for this recipe
-    setReports(prev => prev.map(rep => {
-      if (rep.targetType === 'recipe' && rep.targetId === id && rep.status === 'pending') {
-        return { ...rep, status: 'resolved_removed' };
-      }
-      return rep;
-    }));
-
     showToast(`Receta "${target.title}" eliminada con éxito.`);
     return true;
   };
 
   const togglePinRecipe = (recipeId: string) => {
+    if (!currentUser) {
+      showToast('Inicia sesión para gestionar recetas fijadas.');
+      return;
+    }
     const target = recipes.find(r => r.id === recipeId);
     if (!target) return;
     
-    // Check permission: author or editor or admin
     if (target.authorId !== currentUser.id && currentUser.role !== 'editor' && currentUser.role !== 'admin') {
       showToast('Solo los autores o editores pueden fijar recetas en el perfil.');
       return;
     }
 
     const nextState = !target.isPinned;
-    setRecipes(prev => prev.map(r => {
-      if (r.id === recipeId) {
-        return { ...r, isPinned: nextState };
-      }
-      // If pinning a new recipe, unpin any other recipe by this author
-      if (nextState && r.authorId === target.authorId && r.isPinned) {
-        return { ...r, isPinned: false };
-      }
-      return r;
-    }));
-
+    setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, isPinned: nextState } : r));
     setUsers(prev => prev.map(u => {
       if (u.id === currentUser.id) {
         return { ...u, pinnedRecipeId: nextState ? recipeId : undefined };
       }
       return u;
     }));
-
-    showToast(nextState ? 'Receta fijada en la parte superior de tu perfil.' : 'Receta desfijada del perfil.');
+    showToast(nextState ? 'Receta fijada en la parte superior.' : 'Receta desfijada.');
   };
 
   const toggleLikeRecipe = (recipeId: string) => {
-    const targetRecipe = recipes.find(r => r.id === recipeId);
-    const wasAlreadyLiked = targetRecipe ? targetRecipe.likedUserIds.includes(currentUser.id) : false;
-
+    if (!currentUser) {
+      showToast('Inicia sesión para votar por esta receta.');
+      return;
+    }
     setRecipes(prev => prev.map(r => {
       if (r.id !== recipeId) return r;
       const alreadyLiked = r.likedUserIds.includes(currentUser.id);
@@ -833,24 +1130,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dislikesCount: Math.max(0, (r.dislikesCount ?? 0) + diffDislikes)
       };
     }));
-
-    // If adding a like (not unliking), notify the recipe owner
-    if (!wasAlreadyLiked && targetRecipe) {
-      const notif: AppNotification = {
-        id: `notif-like-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        userId: targetRecipe.authorId,
-        title: '¡A alguien le gustó tu receta!',
-        message: `A ${currentUser.name} le ha gustado tu receta "${targetRecipe.title}".`,
-        createdAt: new Date().toISOString(),
-        read: false,
-        type: 'like',
-        linkTarget: recipeId
-      };
-      setNotifications(prev => [notif, ...prev]);
-    }
   };
 
   const toggleDislikeRecipe = (recipeId: string) => {
+    if (!currentUser) {
+      showToast('Inicia sesión para votar por esta receta.');
+      return;
+    }
     setRecipes(prev => prev.map(r => {
       if (r.id !== recipeId) return r;
       const alreadyLiked = r.likedUserIds.includes(currentUser.id);
@@ -876,58 +1162,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const publishScheduledNow = (recipeId: string) => {
-    changeRecipeStatus(recipeId, 'published');
+  const toggleFeaturedRecipe = (recipeId: string, timeframe: 'day' | 'week' | 'month') => {
+    if (!currentUser || (currentUser.role !== 'editor' && currentUser.role !== 'admin')) {
+      showToast('Solo los editores o administradores pueden destacar recetas en el catálogo.');
+      return;
+    }
+    setRecipes(prev => prev.map(r => {
+      if (r.id !== recipeId) return r;
+      if (timeframe === 'day') {
+        const next = !r.isFeaturedDay;
+        showToast(next ? `Receta "${r.title}" destacada en el Top del Día.` : `Receta retirada del Top del Día.`);
+        return { ...r, isFeaturedDay: next };
+      } else if (timeframe === 'week') {
+        const next = !r.isFeaturedWeek;
+        showToast(next ? `Receta "${r.title}" destacada en el Top de la Semana.` : `Receta retirada del Top de la Semana.`);
+        return { ...r, isFeaturedWeek: next };
+      } else {
+        const next = !r.isFeaturedMonth;
+        showToast(next ? `Receta "${r.title}" destacada en el Top del Mes.` : `Receta retirada del Top del Mes.`);
+        return { ...r, isFeaturedMonth: next };
+      }
+    }));
   };
 
-  const changeRecipeStatus = (recipeId: string, newStatus: RecipeStatus, scheduledDate?: string) => {
-    const target = recipes.find(r => r.id === recipeId);
-    if (!target) return;
-
-    let isoScheduled: string | undefined = undefined;
-    if (newStatus === 'scheduled') {
-      try {
-        const d = scheduledDate ? new Date(scheduledDate) : new Date(Date.now() + 86400000 * 3);
-        isoScheduled = isNaN(d.getTime()) ? new Date(Date.now() + 86400000 * 3).toISOString() : d.toISOString();
-      } catch {
-        isoScheduled = new Date(Date.now() + 86400000 * 3).toISOString();
-      }
-    }
-
+  const publishScheduledNow = (recipeId: string) => {
     setRecipes(prev => prev.map(r => {
       if (r.id === recipeId) {
         return {
           ...r,
-          status: newStatus,
-          scheduledPublishDate: isoScheduled,
+          status: 'published',
           updatedAt: new Date().toISOString()
         };
       }
       return r;
     }));
-
-    if (newStatus === 'published') {
-      const notif: AppNotification = {
-        id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        userId: target.authorId,
-        title: 'Receta publicada',
-        message: `Tu receta "${target.title}" ha sido publicada exitosamente en el catálogo.`,
-        createdAt: new Date().toISOString(),
-        read: false,
-        type: 'scheduled_published',
-        linkTarget: target.id
-      };
-      setNotifications(prev => [notif, ...prev]);
-      showToast(`¡Receta "${target.title}" publicada en la comunidad!`);
-    } else if (newStatus === 'draft') {
-      showToast(`Receta "${target.title}" guardada como borrador privado.`);
-    } else if (newStatus === 'scheduled') {
-      showToast(`Receta "${target.title}" programada para publicación automática.`);
-    }
+    showToast('¡Receta programada publicada inmediatamente!');
   };
 
   // Comments
   const addComment = (recipeId: string, content: string, parentCommentId?: string) => {
+    if (!currentUser) {
+      showToast('Por favor inicia sesión para comentar en las recetas.');
+      return;
+    }
     if (!content.trim()) return;
     const newComment: RecipeComment = {
       id: `comm-${Date.now()}`,
@@ -944,98 +1221,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setComments(prev => [...prev, newComment]);
     setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, commentsCount: r.commentsCount + 1 } : r));
-
-    // Send notification to recipe owner
-    const targetRecipe = recipes.find(r => r.id === recipeId);
-    if (targetRecipe) {
-      const notif: AppNotification = {
-        id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        userId: targetRecipe.authorId,
-        title: 'Nuevo comentario en tu receta',
-        message: `${currentUser.name} ha comentado en tu receta "${targetRecipe.title}".`,
-        createdAt: new Date().toISOString(),
-        read: false,
-        type: 'comment',
-        linkTarget: recipeId
-      };
-      setNotifications(prev => [notif, ...prev]);
-    }
-
-    // If replying to another comment, also notify parent comment author if different
-    if (parentCommentId) {
-      const parentComment = comments.find(c => c.id === parentCommentId);
-      if (parentComment && parentComment.authorId !== currentUser.id && parentComment.authorId !== targetRecipe?.authorId) {
-        const replyNotif: AppNotification = {
-          id: `notif-reply-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          userId: parentComment.authorId,
-          title: 'Respuesta a tu comentario',
-          message: `${currentUser.name} respondió a tu comentario en "${targetRecipe?.title || 'una receta'}".`,
-          createdAt: new Date().toISOString(),
-          read: false,
-          type: 'comment',
-          linkTarget: recipeId
-        };
-        setNotifications(prev => [replyNotif, ...prev]);
-      }
-    }
-
     showToast('Comentario publicado en la receta.');
   };
 
   const editComment = (commentId: string, newContent: string) => {
-    if (!newContent.trim()) return;
+    if (!currentUser) {
+      showToast('Inicia sesión para editar tu comentario.');
+      return;
+    }
+    const cleanContent = newContent.trim();
+    if (!cleanContent) {
+      showToast('El comentario no puede estar vacío.');
+      return;
+    }
+
     setComments(prev => prev.map(c => {
       if (c.id === commentId) {
+        if (c.authorId !== currentUser.id && currentUser.role !== 'admin') {
+          showToast('Solo el autor o el administrador pueden editar este comentario.');
+          return c;
+        }
         return {
           ...c,
-          content: newContent.trim(),
+          content: cleanContent,
           updatedAt: new Date().toISOString()
         };
       }
       return c;
     }));
-    showToast('Comentario editado correctamente.');
+    showToast('Comentario editado con éxito.');
   };
 
   const deleteComment = (commentId: string) => {
+    if (!currentUser) {
+      showToast('Inicia sesión para eliminar tu comentario.');
+      return;
+    }
     const target = comments.find(c => c.id === commentId);
     if (!target) return;
+    const canDelete = target.authorId === currentUser.id || currentUser.role === 'admin' || currentUser.role === 'editor';
+    if (!canDelete) {
+      showToast('No tienes permisos suficientes para eliminar este comentario.');
+      return;
+    }
+
     setComments(prev => prev.filter(c => c.id !== commentId && c.parentCommentId !== commentId));
-    setRecipes(prev => prev.map(r => {
-      if (r.id === target.recipeId) {
-        return { ...r, commentsCount: Math.max(0, r.commentsCount - 1) };
-      }
-      return r;
-    }));
+    setRecipes(prev => prev.map(r => r.id === target.recipeId ? { ...r, commentsCount: Math.max(0, r.commentsCount - 1) } : r));
     showToast('Comentario eliminado.');
   };
 
-  const toggleCommentVote = (commentId: string, type: 'like' | 'dislike') => {
+  const voteComment = (commentId: string, type: 'like' | 'dislike') => {
+    if (!currentUser) {
+      showToast('Inicia sesión para calificar este comentario.');
+      return;
+    }
+
     setComments(prev => prev.map(c => {
       if (c.id !== commentId) return c;
-
-      const baseLikes = c.baseLikes !== undefined
-        ? c.baseLikes
-        : (c.likedUserIds && c.likedUserIds.length > 0 ? Math.max(0, (c.likes ?? 0) - c.likedUserIds.length) : (c.likes ?? 0));
-      const baseDislikes = c.baseDislikes ?? 0;
-
       const likedList = c.likedUserIds || [];
       const dislikedList = c.dislikedUserIds || [];
-      const isLiked = likedList.includes(currentUser.id);
-      const isDisliked = dislikedList.includes(currentUser.id);
+      const alreadyLiked = likedList.includes(currentUser.id);
+      const alreadyDisliked = dislikedList.includes(currentUser.id);
 
       let nextLiked = [...likedList];
       let nextDisliked = [...dislikedList];
 
       if (type === 'like') {
-        if (isLiked) {
+        if (alreadyLiked) {
           nextLiked = nextLiked.filter(id => id !== currentUser.id);
         } else {
           nextLiked.push(currentUser.id);
           nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
         }
       } else {
-        if (isDisliked) {
+        if (alreadyDisliked) {
           nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
         } else {
           nextDisliked.push(currentUser.id);
@@ -1045,11 +1304,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return {
         ...c,
-        baseLikes,
-        baseDislikes,
         likedUserIds: nextLiked,
         dislikedUserIds: nextDisliked,
-        likes: baseLikes + nextLiked.length
+        likes: nextLiked.length - nextDisliked.length
       };
     }));
   };
@@ -1073,24 +1330,149 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComparingRecipeIds([]);
   };
 
-  // Shopping Cart & Ingredients
+  // Helper for consolidating ingredients across recipes
+  const normalizeIngName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\(.*?\)/g, '')
+      .trim();
+  };
+
+  // Shopping Cart & Ingredients (Multi-Recipe & Consolidation)
   const addRecipeIngredientsToCart = (recipe: Recipe, selectedIngredientIds?: string[]) => {
     const ingsToAdd = selectedIngredientIds 
       ? recipe.ingredients.filter(ing => selectedIngredientIds.includes(ing.id))
       : recipe.ingredients;
 
-    const newItems: CartItem[] = ingsToAdd.map(ing => ({
-      id: `cart-${recipe.id}-${ing.id}-${Date.now()}`,
-      ingredient: ing,
-      recipeTitle: recipe.title,
-      recipeId: recipe.id,
-      quantityNeeded: ing.quantity,
-      haveInPantry: false,
-      storeName: ing.storeName
-    }));
+    setCart(prev => {
+      const updated = [...prev];
 
-    setCart(prev => [...prev, ...newItems]);
-    showToast(`${newItems.length} ingredientes de "${recipe.title}" agregados al carrito virtual.`);
+      ingsToAdd.forEach(ing => {
+        const norm = normalizeIngName(ing.name);
+        const existingIdx = updated.findIndex(item => 
+          normalizeIngName(item.ingredient.name) === norm &&
+          item.ingredient.unit.toLowerCase().trim() === ing.unit.toLowerCase().trim()
+        );
+
+        if (existingIdx >= 0) {
+          // Consolidate quantity
+          const existing = updated[existingIdx];
+          const newQty = existing.quantityNeeded + ing.quantity;
+          const currentSources: CartItemSource[] = existing.sources && existing.sources.length > 0
+            ? [...existing.sources]
+            : [{ recipeId: existing.recipeId, recipeTitle: existing.recipeTitle, quantity: existing.quantityNeeded }];
+
+          const sIdx = currentSources.findIndex(s => s.recipeId === recipe.id);
+          if (sIdx >= 0) {
+            currentSources[sIdx] = {
+              ...currentSources[sIdx],
+              quantity: currentSources[sIdx].quantity + ing.quantity
+            };
+          } else {
+            currentSources.push({
+              recipeId: recipe.id,
+              recipeTitle: recipe.title,
+              quantity: ing.quantity
+            });
+          }
+
+          updated[existingIdx] = {
+            ...existing,
+            quantityNeeded: newQty,
+            sources: currentSources
+          };
+        } else {
+          // Add as new item
+          const newItem: CartItem = {
+            id: `cart-${recipe.id}-${ing.id}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            ingredient: ing,
+            recipeTitle: recipe.title,
+            recipeId: recipe.id,
+            quantityNeeded: ing.quantity,
+            haveInPantry: false,
+            storeName: ing.storeName,
+            sources: [{
+              recipeId: recipe.id,
+              recipeTitle: recipe.title,
+              quantity: ing.quantity
+            }]
+          };
+          updated.push(newItem);
+        }
+      });
+
+      return updated;
+    });
+
+    showToast(`Ingredientes de "${recipe.title}" añadidos y consolidados en el carrito.`);
+  };
+
+  const addMultipleRecipesToCart = (recipeList: Recipe[]) => {
+    if (!recipeList.length) return;
+
+    setCart(prev => {
+      const updated = [...prev];
+
+      recipeList.forEach(recipe => {
+        recipe.ingredients.forEach(ing => {
+          const norm = normalizeIngName(ing.name);
+          const existingIdx = updated.findIndex(item => 
+            normalizeIngName(item.ingredient.name) === norm &&
+            item.ingredient.unit.toLowerCase().trim() === ing.unit.toLowerCase().trim()
+          );
+
+          if (existingIdx >= 0) {
+            const existing = updated[existingIdx];
+            const newQty = existing.quantityNeeded + ing.quantity;
+            const currentSources: CartItemSource[] = existing.sources && existing.sources.length > 0
+              ? [...existing.sources]
+              : [{ recipeId: existing.recipeId, recipeTitle: existing.recipeTitle, quantity: existing.quantityNeeded }];
+
+            const sIdx = currentSources.findIndex(s => s.recipeId === recipe.id);
+            if (sIdx >= 0) {
+              currentSources[sIdx] = {
+                ...currentSources[sIdx],
+                quantity: currentSources[sIdx].quantity + ing.quantity
+              };
+            } else {
+              currentSources.push({
+                recipeId: recipe.id,
+                recipeTitle: recipe.title,
+                quantity: ing.quantity
+              });
+            }
+
+            updated[existingIdx] = {
+              ...existing,
+              quantityNeeded: newQty,
+              sources: currentSources
+            };
+          } else {
+            const newItem: CartItem = {
+              id: `cart-${recipe.id}-${ing.id}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              ingredient: ing,
+              recipeTitle: recipe.title,
+              recipeId: recipe.id,
+              quantityNeeded: ing.quantity,
+              haveInPantry: false,
+              storeName: ing.storeName,
+              sources: [{
+                recipeId: recipe.id,
+                recipeTitle: recipe.title,
+                quantity: ing.quantity
+              }]
+            };
+            updated.push(newItem);
+          }
+        });
+      });
+
+      return updated;
+    });
+
+    showToast(`¡${recipeList.length} recetas añadidas al carrito con cantidades consolidadas!`);
   };
 
   const togglePantryItem = (cartItemId: string) => {
@@ -1101,6 +1483,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return item;
     }));
+  };
+
+  const updateCartItemQuantity = (cartItemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(cartItemId);
+      return;
+    }
+    setCart(prev => prev.map(item => item.id === cartItemId ? { ...item, quantityNeeded: newQuantity } : item));
+  };
+
+  const updateCartItemStore = (cartItemId: string, newStoreIdOrName: string) => {
+    const store = PARTNER_STORES.find(s => s.id === newStoreIdOrName || s.name.toLowerCase() === newStoreIdOrName.toLowerCase());
+    const storeName = store ? store.name : newStoreIdOrName;
+    const storeId = store ? store.id : undefined;
+
+    setCart(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        return {
+          ...item,
+          storeName: storeName,
+          customStoreId: storeId,
+          ingredient: {
+            ...item.ingredient,
+            storeName: storeName,
+            inStock: true,
+            stockLevel: 'alto'
+          }
+        };
+      }
+      return item;
+    }));
+    showToast(`Tienda cambiada a "${storeName}" para este ingrediente.`);
+  };
+
+  const applyCartItemSubstitute = (cartItemId: string, substituteName: string) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        return {
+          ...item,
+          substitutedBy: substituteName,
+          ingredient: {
+            ...item.ingredient,
+            name: substituteName,
+            inStock: true,
+            stockLevel: 'medio'
+          }
+        };
+      }
+      return item;
+    }));
+    showToast(`Ingrediente sustituido por "${substituteName}".`);
   };
 
   const removeFromCart = (cartItemId: string) => {
@@ -1114,6 +1547,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Wishlist & Collections
   const toggleWishlist = (recipeId: string) => {
+    if (!currentUser) {
+      showToast('Inicia sesión para guardar recetas en tu lista de deseos.');
+      return;
+    }
     const inWishlist = currentUser.wishlistRecipeIds.includes(recipeId);
     setUsers(prev => prev.map(u => {
       if (u.id === currentUser.id) {
@@ -1129,7 +1566,95 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(inWishlist ? 'Eliminado de tu lista de deseos.' : 'Guardado en tu lista de deseos para cocinar luego.');
   };
 
+  const toggleWishlistIngredient = (ingredient: Ingredient, recipeId: string, recipeTitle: string) => {
+    if (!currentUser) {
+      showToast('Inicia sesión para guardar ingredientes en tu lista de deseos.');
+      return;
+    }
+    const currentWishlist = currentUser.wishlistIngredientItems || [];
+    const exists = currentWishlist.some(w => 
+      w.ingredient.id === ingredient.id || 
+      normalizeIngName(w.ingredient.name) === normalizeIngName(ingredient.name)
+    );
+
+    let nextWishlist: WishlistIngredientItem[];
+    if (exists) {
+      nextWishlist = currentWishlist.filter(w => 
+        !(w.ingredient.id === ingredient.id || normalizeIngName(w.ingredient.name) === normalizeIngName(ingredient.name))
+      );
+      showToast(`"${ingredient.name}" eliminado de tu lista de deseos.`);
+    } else {
+      const newItem: WishlistIngredientItem = {
+        id: `wish-ing-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        ingredient,
+        recipeId,
+        recipeTitle,
+        addedAt: new Date().toISOString()
+      };
+      nextWishlist = [newItem, ...currentWishlist];
+      showToast(`"${ingredient.name}" guardado en tu lista de deseos.`);
+    }
+
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, wishlistIngredientItems: nextWishlist } : u));
+  };
+
+  const removeWishlistIngredient = (wishlistIngredientId: string) => {
+    if (!currentUser) return;
+    const nextWishlist = (currentUser.wishlistIngredientItems || []).filter(w => w.id !== wishlistIngredientId);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, wishlistIngredientItems: nextWishlist } : u));
+    showToast('Ingrediente retirado de la lista de deseos.');
+  };
+
+  const moveWishlistIngredientToCart = (wishlistIngredientId: string) => {
+    if (!currentUser) return;
+    const item = (currentUser.wishlistIngredientItems || []).find(w => w.id === wishlistIngredientId);
+    if (!item) return;
+
+    const pseudoRecipe: Recipe = {
+      id: item.recipeId,
+      title: item.recipeTitle,
+      ingredients: [item.ingredient]
+    } as any;
+
+    addRecipeIngredientsToCart(pseudoRecipe, [item.ingredient.id]);
+    removeWishlistIngredient(wishlistIngredientId);
+    showToast(`"${item.ingredient.name}" movido al carrito.`);
+  };
+
+  const moveCartItemToWishlist = (cartItemId: string) => {
+    const item = cart.find(c => c.id === cartItemId);
+    if (!item) return;
+    if (!currentUser) {
+      showToast('Inicia sesión para guardar ingredientes en tu lista de deseos.');
+      return;
+    }
+    toggleWishlistIngredient(item.ingredient, item.recipeId, item.recipeTitle);
+    removeFromCart(cartItemId);
+  };
+
+  const addAllWishlistIngredientsToCart = () => {
+    if (!currentUser || !currentUser.wishlistIngredientItems || currentUser.wishlistIngredientItems.length === 0) {
+      showToast('No tienes ingredientes en tu lista de deseos.');
+      return;
+    }
+
+    currentUser.wishlistIngredientItems.forEach(wishItem => {
+      const pseudoRecipe: Recipe = {
+        id: wishItem.recipeId,
+        title: wishItem.recipeTitle,
+        ingredients: [wishItem.ingredient]
+      } as any;
+      addRecipeIngredientsToCart(pseudoRecipe, [wishItem.ingredient.id]);
+    });
+
+    showToast(`¡Se agregaron ${currentUser.wishlistIngredientItems.length} ingredientes guardados al carrito!`);
+  };
+
   const createCollection = (name: string, description: string, recipeIds: string[], isPrivate = false) => {
+    if (!currentUser) {
+      showToast('Inicia sesión para crear colecciones de recetas.');
+      return;
+    }
     const newCol: RecipeCollection = {
       id: `col-${Date.now()}`,
       name,
@@ -1162,8 +1687,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetType,
       targetId,
       targetTitleOrName: titleOrName,
-      reporterId: currentUser.id,
-      reporterName: currentUser.name,
+      reporterId: currentUser ? currentUser.id : 'guest-reporter',
+      reporterName: currentUser ? currentUser.name : 'Usuario de la Comunidad',
       reason,
       details,
       status: 'pending',
@@ -1177,30 +1702,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const report = reports.find(r => r.id === reportId);
     if (!report) return;
 
-    // Permissions: admin or editor
-    if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
-      showToast('No tienes permisos de moderación para realizar esta acción.');
-      return;
-    }
-
     if (resolution === 'removed') {
       if (report.targetType === 'recipe') {
-        const recipeId = report.targetId;
-        // Cascade delete recipe
-        setRecipes(prev => prev.filter(r => r.id !== recipeId));
-        setCart(prev => prev.filter(c => c.recipeId !== recipeId));
-        setComparingRecipeIds(prev => prev.filter(cid => cid !== recipeId));
-        setComments(prev => prev.filter(c => c.recipeId !== recipeId));
-        setCollections(prev => prev.map(col => ({
-          ...col,
-          recipeIds: col.recipeIds.filter(rid => rid !== recipeId)
-        })));
-        setUsers(prev => prev.map(u => ({
-          ...u,
-          pinnedRecipeId: u.pinnedRecipeId === recipeId ? undefined : u.pinnedRecipeId,
-          wishlistRecipeIds: u.wishlistRecipeIds.filter(wid => wid !== recipeId)
-        })));
-        setPrintableRecipe(prev => prev?.id === recipeId ? null : prev);
+        setRecipes(prev => prev.filter(r => r.id !== report.targetId));
       } else {
         setUsers(prev => prev.map(u => u.id === report.targetId ? { ...u, isBanned: true } : u));
       }
@@ -1211,15 +1715,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: resolution === 'removed' ? 'resolved_removed' : 'dismissed'
     } : r));
 
-    showToast(
-      resolution === 'removed'
-        ? (report.targetType === 'recipe' ? `Receta "${report.targetTitleOrName}" eliminada de la plataforma.` : 'Perfil suspendido y reporte resuelto.')
-        : 'Reporte desestimado: el contenido se mantendrá activo.'
-    );
+    showToast(resolution === 'removed' ? 'Elemento retirado y reporte marcado como resuelto.' : 'Reporte desestimado.');
   };
 
   // Forum
   const createForumTopic = (category: ForumTopic['category'], title: string, content: string, tags: string[]) => {
+    if (!currentUser) {
+      showToast('Por favor inicia sesión para abrir un debate en el foro.');
+      return '';
+    }
     const newId = `top-${Date.now()}`;
     const newTopic: ForumTopic = {
       id: newId,
@@ -1241,6 +1745,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createForumReply = (topicId: string, content: string) => {
+    if (!currentUser) {
+      showToast('Por favor inicia sesión para participar en el foro.');
+      return;
+    }
     if (!content.trim()) return;
     const newReply: ForumReply = {
       id: `rep-${Date.now()}`,
@@ -1248,13 +1756,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       authorId: currentUser.id,
       authorName: currentUser.name,
       authorAvatar: currentUser.avatar,
-      content: content.trim(),
+      content,
       createdAt: new Date().toISOString(),
-      baseLikes: 0,
-      baseDislikes: 0,
       likesCount: 0,
-      likedUserIds: [],
-      dislikedUserIds: []
     };
     setForumReplies(prev => [...prev, newReply]);
     setForumTopics(prev => prev.map(t => t.id === topicId ? { ...t, repliesCount: t.repliesCount + 1 } : t));
@@ -1262,65 +1766,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleForumReplyLike = (replyId: string) => {
-    toggleForumReplyVote(replyId, 'like');
-  };
-
-  const toggleForumReplyVote = (replyId: string, type: 'like' | 'dislike') => {
-    setForumReplies(prev => prev.map(r => {
-      if (r.id !== replyId) return r;
-
-      const baseLikes = r.baseLikes !== undefined
-        ? r.baseLikes
-        : (r.likedUserIds && r.likedUserIds.length > 0 ? Math.max(0, (r.likesCount ?? 0) - r.likedUserIds.length) : (r.likesCount ?? 0));
-      const baseDislikes = r.baseDislikes ?? 0;
-
-      const likedList = r.likedUserIds || [];
-      const dislikedList = r.dislikedUserIds || [];
-      const isLiked = likedList.includes(currentUser.id);
-      const isDisliked = dislikedList.includes(currentUser.id);
-
-      let nextLiked = [...likedList];
-      let nextDisliked = [...dislikedList];
-
-      if (type === 'like') {
-        if (isLiked) {
-          nextLiked = nextLiked.filter(id => id !== currentUser.id);
-        } else {
-          nextLiked.push(currentUser.id);
-          nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
-        }
-      } else {
-        if (isDisliked) {
-          nextDisliked = nextDisliked.filter(id => id !== currentUser.id);
-        } else {
-          nextDisliked.push(currentUser.id);
-          nextLiked = nextLiked.filter(id => id !== currentUser.id);
-        }
-      }
-
-      return {
-        ...r,
-        baseLikes,
-        baseDislikes,
-        likedUserIds: nextLiked,
-        dislikedUserIds: nextDisliked,
-        likesCount: baseLikes + nextLiked.length
-      };
-    }));
-  };
-
-  const editForumReply = (replyId: string, content: string) => {
-    if (!content.trim()) return;
-    setForumReplies(prev => prev.map(r => r.id === replyId ? { ...r, content: content.trim(), updatedAt: new Date().toISOString() } : r));
-    showToast('Respuesta editada correctamente.');
-  };
-
-  const deleteForumReply = (replyId: string) => {
-    const target = forumReplies.find(r => r.id === replyId);
-    if (!target) return;
-    setForumReplies(prev => prev.filter(r => r.id !== replyId));
-    setForumTopics(prev => prev.map(t => t.id === target.topicId ? { ...t, repliesCount: Math.max(0, t.repliesCount - 1) } : t));
-    showToast('Respuesta eliminada.');
+    setForumReplies(prev => prev.map(r => r.id === replyId ? { ...r, likesCount: r.likesCount + 1 } : r));
   };
 
   const markBestAnswer = (replyId: string) => {
@@ -1337,30 +1783,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => n.userId === currentUser.id ? { ...n, read: true } : n));
-    showToast('Todas tus notificaciones marcadas como leídas.');
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    showToast('Todas las notificaciones marcadas como leídas.');
   };
 
   // Exporting & Printing
-  const exportRecipePdf = (recipe: Recipe) => {
-    // Prompt confirmation dialog before downloading
-    setRecipeToConfirmDownload(recipe);
-  };
-
-  const executeDownloadRecipePdf = (recipeOverride?: Recipe) => {
-    const target = recipeOverride || recipeToConfirmDownload;
-    if (!target) return;
-    try {
-      downloadRecipePdf(target);
-      showToast(`Receta "${target.title}" descargada en formato PDF.`);
-    } catch (err) {
-      console.error('Error al generar PDF:', err);
-      showToast('Error al generar el PDF de la receta.');
-    } finally {
-      setRecipeToConfirmDownload(null);
-    }
-  };
-
   const exportRecipeJson = (recipe: Recipe) => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(recipe, null, 2));
     const downloadAnchor = document.createElement('a');
@@ -1386,19 +1813,17 @@ Etiquetas: ${recipe.tags.join(', ')}
 DESCRIPCIÓN:
 ${recipe.description}
 
-INFORMACIÓN NUTRICIONAL (Por porción):
-Calorías: ${recipe.nutrition.calories} kcal | Proteínas: ${recipe.nutrition.proteinG}g
-Carbohidratos: ${recipe.nutrition.carbsG}g | Grasas: ${recipe.nutrition.fatG}g | Fibra: ${recipe.nutrition.fiberG}g
-
 INGREDIENTES:
-${recipe.ingredients.map(ing => `- ${ing.quantity} ${ing.unit} de ${ing.name} (Tienda: ${ing.storeName})`).join('\n')}
+${recipe.ingredients.map(i => `- ${i.quantity} ${i.unit} de ${i.name} (${i.storeName} - ~${formatARS(i.estimatedPrice)})`).join('\n')}
 
 PASO A PASO:
-${recipe.steps.map(s => `${s.stepNumber}. ${s.title} (${s.durationMinutes} min)\n   ${s.description}${s.tip ? `\n   Consejo: ${s.tip}` : ''}`).join('\n\n')}
+${recipe.steps.map(s => `${s.stepNumber}. ${s.title.toUpperCase()} (${s.durationMinutes} min)\n${s.description}${s.tip ? `\nConsejo Chef: ${s.tip}` : ''}`).join('\n\n')}
 
-Gusto - Sistema de Gestión de Recetas.
-    `.trim();
+INFORMACIÓN NUTRICIONAL:
+Calorías: ${recipe.nutrition.calories} kcal | Proteínas: ${recipe.nutrition.proteinG}g | Carbohidratos: ${recipe.nutrition.carbsG}g | Grasas: ${recipe.nutrition.fatG}g | Fibra: ${recipe.nutrition.fiberG}g
 
+Receta generada por Gusto - Sistema de Gestión de Recetas.
+`;
     const dataStr = 'data:text/plain;charset=utf-8,' + encodeURIComponent(textContent);
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
@@ -1406,91 +1831,65 @@ Gusto - Sistema de Gestión de Recetas.
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    showToast(`Tarjeta de lectura rápida exportada.`);
-  };
-
-  const getFamousWeeklyRecipes = (): Recipe[] => {
-    return [...recipes]
-      .filter((r) => r.status === 'published')
-      .sort((a, b) => b.likesCount - a.likesCount);
-  };
-
-  const exportWeeklyPlannerPdf = (): boolean => {
-    const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
-    if (!isPremiumOrAdmin) {
-      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi perfil para descargar el Planificador Semanal en formato .PDF');
-      return false;
-    }
-    const famous = getFamousWeeklyRecipes();
-    downloadWeeklyPlannerPdf({
-      famousRecipes: famous.length > 0 ? famous : recipes,
-      currentUser,
-      weekTitle: 'Planificador Semanal Gourmet Gusto'
-    });
-    showToast('Planificador semanal exportado exitosamente en formato .PDF');
-    return true;
-  };
-
-  const exportRecipePackagePdf = (collection?: RecipeCollection): boolean => {
-    const isPremiumOrAdmin = currentUser.role === 'premium' || currentUser.role === 'admin';
-    if (!isPremiumOrAdmin) {
-      showToast('Exclusivo para usuarios Premium: Activa tu membresía Premium en Mi perfil para exportar paquetes de recetas en formato .PDF');
-      return false;
-    }
-
-    if (collection) {
-      const collectedRecipes = recipes.filter((r) => collection.recipeIds.includes(r.id));
-      if (collectedRecipes.length === 0) {
-        showToast('Esta colección aún no tiene recetas agregadas.');
-        return false;
-      }
-      downloadRecipePackagePdf({
-        packageName: collection.name,
-        description: collection.description || 'Colección privada seleccionada de recetas.',
-        recipes: collectedRecipes,
-        curatedBy: currentUser.name,
-      });
-      showToast(`Paquete culinario "${collection.name}" exportado exitosamente en formato .PDF`);
-      return true;
-    }
-
-    // Default package: Recetas más famosas de la semana
-    const famous = getFamousWeeklyRecipes();
-    const targetRecipes = famous.slice(0, 7);
-    downloadRecipePackagePdf({
-      packageName: 'Las Recetas Más Famosas de la Semana',
-      description: 'Edición exclusiva con las preparaciones más aclamadas y votadas por la comunidad culinaria de Gusto.',
-      recipes: targetRecipes,
-      curatedBy: currentUser.name,
-    });
-    showToast('Paquete de recetas más famosas exportado exitosamente en formato .PDF');
-    return true;
+    showToast(`Receta "${recipe.title}" descargada en formato texto.`);
   };
 
   const exportCollectionPackage = (collection: RecipeCollection) => {
-    exportRecipePackagePdf(collection);
+    const collectionRecipes = recipes.filter(r => collection.recipeIds.includes(r.id));
+    const packageData = {
+      collectionName: collection.name,
+      description: collection.description,
+      exportedAt: new Date().toISOString(),
+      recipesCount: collectionRecipes.length,
+      recipes: collectionRecipes
+    };
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(packageData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `coleccion_${collection.name.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast(`Colección completa "${collection.name}" exportada con sus recetas.`);
   };
 
   return (
     <AppContext.Provider
       value={{
-        isAuthenticated,
-        setIsAuthenticated,
         currentUser,
         allUsers: users,
         switchUserRole,
         selectSpecificUser,
         loginUser,
-        loginUserWithPassword,
-        quickLoginAsUser,
         registerUser,
-        registerNewUser,
-        updateUserRole,
+        loginWithProvider,
         logoutUser,
         updateUserProfile,
         addSubProfile,
+        deleteSubProfile,
         switchActiveSubProfile,
+        
+        // Address Management
+        userAddresses,
+        activeDeliveryAddress,
+        addUserAddress,
+        updateUserAddress,
+        deleteUserAddress,
+        setDefaultAddress,
+
+        // Orders & Tracking
+        orders,
+        createOrderFromCart,
+        advanceOrderStatus,
+        cancelOrder,
+        selectedOrderForTracking,
+        setSelectedOrderForTracking,
+
+        resetSimulation,
         requestPasswordReset,
+        resetPasswordWithToken,
+        clearResetSimulation,
+
         followUserToggle,
 
         recipes,
@@ -1501,13 +1900,13 @@ Gusto - Sistema de Gestión de Recetas.
         toggleLikeRecipe,
         toggleDislikeRecipe,
         publishScheduledNow,
-        changeRecipeStatus,
+        toggleFeaturedRecipe,
 
         comments,
         addComment,
         editComment,
         deleteComment,
-        toggleCommentVote,
+        voteComment,
 
         comparingRecipeIds,
         toggleCompareRecipe,
@@ -1515,13 +1914,26 @@ Gusto - Sistema de Gestión de Recetas.
 
         cart,
         addRecipeIngredientsToCart,
+        addMultipleRecipesToCart,
         togglePantryItem,
+        updateCartItemQuantity,
+        updateCartItemStore,
+        applyCartItemSubstitute,
         removeFromCart,
         clearCart,
         selectedStoreFilter,
         setSelectedStoreFilter,
+        userLocation,
+        setUserLocation,
+        preferredStoreId,
+        setPreferredStoreId,
 
         toggleWishlist,
+        toggleWishlistIngredient,
+        removeWishlistIngredient,
+        moveWishlistIngredientToCart,
+        moveCartItemToWishlist,
+        addAllWishlistIngredientsToCart,
         collections,
         createCollection,
         toggleRecipeInCollection,
@@ -1535,9 +1947,6 @@ Gusto - Sistema de Gestión de Recetas.
         createForumTopic,
         createForumReply,
         toggleForumReplyLike,
-        toggleForumReplyVote,
-        editForumReply,
-        deleteForumReply,
         markBestAnswer,
 
         notifications,
@@ -1546,16 +1955,9 @@ Gusto - Sistema de Gestión de Recetas.
 
         printableRecipe,
         setPrintableRecipe,
-        recipeToConfirmDownload,
-        setRecipeToConfirmDownload,
-        executeDownloadRecipePdf,
-        exportRecipePdf,
         exportRecipeJson,
         exportRecipeText,
         exportCollectionPackage,
-        getFamousWeeklyRecipes,
-        exportWeeklyPlannerPdf,
-        exportRecipePackagePdf,
 
         toast,
         showToast

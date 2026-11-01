@@ -1,26 +1,20 @@
 import React, { useState } from 'react';
 import { Recipe } from '../types';
 import { useApp } from '../context/AppContext';
-import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
 
 interface RecipeCardProps {
   recipe: Recipe;
   onOpenDetail: (recipe: Recipe) => void;
   onOpenReport?: (recipe: Recipe) => void;
-  onEditRecipe?: (recipe: Recipe) => void;
-  searchMatchReasons?: { type: string; label: string }[];
 }
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({
   recipe,
   onOpenDetail,
   onOpenReport,
-  onEditRecipe,
-  searchMatchReasons,
 }) => {
   const {
     currentUser,
-    deleteRecipe,
     toggleLikeRecipe,
     toggleDislikeRecipe,
     toggleWishlist,
@@ -29,33 +23,19 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     addRecipeIngredientsToCart,
     togglePinRecipe,
     setPrintableRecipe,
-    exportRecipePdf,
     exportRecipeText,
     publishScheduledNow,
   } = useApp();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const isLiked = recipe.likedUserIds.includes(currentUser.id);
-  const isDisliked = recipe.dislikedUserIds.includes(currentUser.id);
-  const isInWishlist = currentUser.wishlistRecipeIds.includes(recipe.id);
+  const isLiked = currentUser ? recipe.likedUserIds.includes(currentUser.id) : false;
+  const isDisliked = currentUser ? recipe.dislikedUserIds.includes(currentUser.id) : false;
+  const isInWishlist = currentUser ? currentUser.wishlistRecipeIds.includes(recipe.id) : false;
   const isComparing = comparingRecipeIds.includes(recipe.id);
-  const isAuthor = recipe.authorId === currentUser.id;
-  const isCoAuthor = Boolean(
-    recipe.coAuthors &&
-      recipe.coAuthors.some(
-        (ca) =>
-          ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
-          ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
-          (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
-      )
-  );
-  const isStaff = currentUser.role === 'editor' || currentUser.role === 'admin';
-  const canEdit = isAuthor || isCoAuthor || isStaff;
-  const canPin = isAuthor || isStaff;
-  const canDelete = isAuthor || isStaff;
+  const isAuthor = currentUser ? recipe.authorId === currentUser.id : false;
+  const canPin = currentUser ? (isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin') : false;
 
   const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
 
@@ -101,60 +81,39 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             </span>
           )}
           {recipe.status === 'scheduled' && (
-            <span className="bg-[#835500] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-sm">
-              Programada
-            </span>
-          )}
-        </div>
-
-        {/* Action icons container: Direct Pin (if author/staff) and Wishlist */}
-        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-10">
-          {canPin && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                togglePinRecipe(recipe.id);
-              }}
-              aria-label={recipe.isPinned ? "Desfijar del perfil" : "Fijar en la parte superior del perfil"}
-              title={recipe.isPinned ? "Receta fijada al inicio de tu perfil (clic para desfijar)" : "Fijar en la parte superior de tu perfil personal"}
-              className={`w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center shadow-sm transition-all cursor-pointer ${
-                recipe.isPinned
-                  ? 'bg-[#E09F3E] text-white ring-2 ring-white scale-105 shadow-md'
-                  : 'bg-white/85 text-[#5A3900] hover:bg-[#E09F3E] hover:text-white'
-              }`}
-            >
-              <span
-                className="material-symbols-outlined text-[17px]"
-                style={recipe.isPinned ? { fontVariationSettings: "'FILL' 1" } : {}}
-              >
-                push_pin
+            <span className="bg-[#835500] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px]">event_note</span>
+              <span>
+                {recipe.scheduledPublishDate
+                  ? `Prog. ${new Date(recipe.scheduledPublishDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+                  : 'Programada'}
               </span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleWishlist(recipe.id);
-            }}
-            aria-label="Guardar en favoritos"
-            title="Guardar en lista de deseos"
-            className={`w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center shadow-sm transition-all cursor-pointer ${
-              isInWishlist
-                ? 'bg-[#AB3333] text-white'
-                : 'bg-white/80 text-[#333333] hover:text-[#AB3333] hover:bg-white'
-            }`}
-          >
-            <span
-              className="material-symbols-outlined text-[18px]"
-              style={isInWishlist ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              bookmark
             </span>
-          </button>
+          )}
         </div>
+
+        {/* Wishlist Bookmark Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleWishlist(recipe.id);
+          }}
+          aria-label="Guardar en favoritos"
+          title="Guardar en lista de deseos"
+          className={`absolute bottom-3 right-3 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center shadow-sm transition-all cursor-pointer ${
+            isInWishlist
+              ? 'bg-[#AB3333] text-white'
+              : 'bg-white/80 text-[#333333] hover:text-[#AB3333] hover:bg-white'
+          }`}
+        >
+          <span
+            className="material-symbols-outlined text-[18px]"
+            style={isInWishlist ? { fontVariationSettings: "'FILL' 1" } : {}}
+          >
+            bookmark
+          </span>
+        </button>
       </div>
 
       {/* Card Content */}
@@ -193,22 +152,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   +{recipe.tags.length - 3}
                 </span>
               )}
-            </div>
-          )}
-
-          {/* RF-16 Search Match Reason indicator */}
-          {searchMatchReasons && searchMatchReasons.length > 0 && (
-            <div className="mb-3 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-[#714500] font-medium animate-in fade-in duration-150">
-              <span className="material-symbols-outlined text-[14px] text-[#835500] shrink-0">
-                {searchMatchReasons[0].type === 'ingrediente'
-                  ? 'kitchen'
-                  : searchMatchReasons[0].type === 'categoria'
-                  ? 'dinner_dining'
-                  : searchMatchReasons[0].type === 'palabra_clave'
-                  ? 'auto_awesome'
-                  : 'search'}
-              </span>
-              <span className="truncate">Coincide {searchMatchReasons[0].label}</span>
             </div>
           )}
         </div>
@@ -298,25 +241,18 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 <span>Ver receta</span>
               </button>
 
-              {/* Compare Button (up to 3 recipes) */}
+              {/* Compare Button */}
               <button
                 type="button"
                 onClick={() => toggleCompareRecipe(recipe.id)}
-                title={
-                  isComparing
-                    ? "Quitar del comparador"
-                    : comparingRecipeIds.length >= 3
-                    ? "Límite alcanzado: máximo 3 recetas lado a lado"
-                    : "Comparar hasta 3 recetas lado a lado"
-                }
-                className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                title="Comparar recetas lado a lado"
+                className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                   isComparing
                     ? 'bg-[#E09F3E] text-white shadow-sm font-semibold'
                     : 'bg-[#F0EDED] text-[#333333] hover:bg-[#FFDDB9]'
                 }`}
               >
-                <span className="material-symbols-outlined text-[14px]">balance</span>
-                <span>{isComparing ? 'En comparador' : 'Comparar'}</span>
+                {isComparing ? '✓ Comparando' : 'Comparar'}
               </button>
             </div>
 
@@ -366,16 +302,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      exportRecipePdf(recipe);
+                      exportRecipeText(recipe);
                       setMenuOpen(false);
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-stone-50 flex items-center gap-2 text-stone-700"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-stone-600">picture_as_pdf</span>
-                    <span>Descargar receta (PDF)</span>
+                    <span className="material-symbols-outlined text-[16px] text-stone-600">download</span>
+                    <span>Descargar texto</span>
                   </button>
 
-                  {recipe.status === 'scheduled' && isAuthor && (
+                  {recipe.status === 'scheduled' && (isAuthor || currentUser?.role === 'admin' || currentUser?.role === 'editor') && (
                     <button
                       type="button"
                       onClick={() => {
@@ -386,34 +322,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     >
                       <span className="material-symbols-outlined text-[16px]">schedule_send</span>
                       <span>Publicar ahora</span>
-                    </button>
-                  )}
-
-                  {canEdit && onEditRecipe && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onEditRecipe(recipe);
-                      }}
-                      className="w-full px-3 py-2 text-left hover:bg-amber-50 flex items-center gap-2 text-amber-800 font-medium border-t border-stone-100 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
-                      <span>Editar receta</span>
-                    </button>
-                  )}
-
-                  {canDelete && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setIsDeleteModalOpen(true);
-                      }}
-                      className="w-full px-3 py-2 text-left hover:bg-red-50 flex items-center gap-2 text-red-600 font-medium border-t border-stone-100"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                      <span>Eliminar receta</span>
                     </button>
                   )}
 
@@ -436,16 +344,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           </div>
         </div>
       </div>
-
-      <ConfirmDeleteRecipeModal
-        isOpen={isDeleteModalOpen}
-        recipeTitle={recipe.title}
-        onConfirm={() => {
-          deleteRecipe(recipe.id);
-          setIsDeleteModalOpen(false);
-        }}
-        onCancel={() => setIsDeleteModalOpen(false)}
-      />
     </article>
   );
 };
