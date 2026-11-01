@@ -13,6 +13,7 @@ import { RecipeEditorModal } from './components/RecipeEditorModal';
 import { RecipeFilterBar } from './components/RecipeFilterBar';
 import { RecipeCompareView } from './components/RecipeCompareView';
 import { ShoppingCartDrawer } from './components/ShoppingCartDrawer';
+import { MultiRecipeShoppingModal } from './components/MultiRecipeShoppingModal';
 import { FeaturedRecipesPanel } from './components/FeaturedRecipesPanel';
 import { CommunityForumView } from './components/CommunityForumView';
 import { UserProfileView } from './components/UserProfileView';
@@ -38,11 +39,8 @@ function AppContent() {
     currentUser,
     printableRecipe,
     setPrintableRecipe,
-    selectSpecificUser,
     toast,
   } = useApp();
-
-  const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
 
   // Navigation view: 'explorar' | 'destacadas' | 'foro' | 'comparar' | 'perfil' | 'moderacion'
   const [activeView, setActiveView] = useState<string>('explorar');
@@ -60,6 +58,7 @@ function AppContent() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isMultiRecipeOpen, setIsMultiRecipeOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   
@@ -93,7 +92,7 @@ function AppContent() {
   const filteredRecipes = useMemo(() => {
     return recipes.filter((recipe) => {
       // If exploring, hide drafts unless current user is author
-      if (recipe.status === 'draft' && recipe.authorId !== currentUser.id) {
+      if (recipe.status === 'draft' && (!currentUser || recipe.authorId !== currentUser.id)) {
         return false;
       }
 
@@ -149,11 +148,21 @@ function AppContent() {
   };
 
   const handleEditRecipe = (recipe: Recipe) => {
+    if (!currentUser) {
+      setAuthInitialMode('login');
+      setIsAuthOpen(true);
+      return;
+    }
     setRecipeToEdit(recipe);
     setIsEditorOpen(true);
   };
 
   const handleCreateNewRecipe = () => {
+    if (!currentUser) {
+      setAuthInitialMode('login');
+      setIsAuthOpen(true);
+      return;
+    }
     setRecipeToEdit(null);
     setIsEditorOpen(true);
   };
@@ -230,18 +239,28 @@ function AppContent() {
 
             {/* Recipe Grid */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <h2 className="text-xs font-bold text-stone-600 uppercase tracking-wider">
                   Catálogo Gastronómico ({filteredRecipes.length} recetas disponibles)
                 </h2>
-                {activeFilterCount > 0 && (
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={handleClearFilters}
-                    className="text-xs text-[#835500] hover:underline font-semibold cursor-pointer"
+                    type="button"
+                    onClick={() => setIsMultiRecipeOpen(true)}
+                    className="text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-3.5 py-1.5 rounded-full transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
                   >
-                    Restablecer filtros
+                    <ShoppingBag className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Compra Multi-Receta Consolidada</span>
                   </button>
-                )}
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={handleClearFilters}
+                      className="text-xs text-[#835500] hover:underline font-semibold cursor-pointer"
+                    >
+                      Restablecer filtros
+                    </button>
+                  )}
+                </div>
               </div>
 
               {filteredRecipes.length === 0 ? (
@@ -312,50 +331,16 @@ function AppContent() {
             onOpenReport={handleOpenReport}
             onEditRecipe={handleEditRecipe}
             onCreateRecipe={handleCreateNewRecipe}
+            onOpenAuth={(mode) => {
+              setAuthInitialMode(mode || 'login');
+              setIsAuthOpen(true);
+            }}
           />
         )}
 
         {/* VIEW 6: Panel de Moderación */}
         {activeView === 'moderacion' && (
-          isStaff ? (
-            <ModerationAdminPanel onOpenDetail={(r) => setSelectedRecipeDetail(r)} />
-          ) : (
-            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-4 max-w-lg mx-auto my-12 shadow-sm">
-              <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
-                <span className="material-symbols-outlined text-[32px]">shield_person</span>
-              </div>
-              <h2 className="font-bold text-stone-900 text-xl font-display">Acceso Restringido</h2>
-              <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-                El panel de moderación está reservado exclusivamente para cuentas de moderación con rol de <strong>Administrador o Editor</strong>.
-              </p>
-              <p className="text-xs text-stone-400">
-                Puedes cambiar rápidamente a una cuenta de moderación para auditar la plataforma:
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => selectSpecificUser('user-ignacio')}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-[#835500] hover:bg-[#5a3900] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Cambiar a Ignacio (Admin)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectSpecificUser('user-lucia')}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-[#e09f3e] hover:bg-[#c58529] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Cambiar a Lucía (Editora)
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveView('explorar')}
-                className="mt-3 text-xs text-stone-500 hover:text-stone-800 underline cursor-pointer"
-              >
-                Volver a Explorar
-              </button>
-            </div>
-          )
+          <ModerationAdminPanel />
         )}
       </main>
 
@@ -378,22 +363,20 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-4 text-xs">
             <span className="text-[#514536]">Plataforma Gastronómica de Recetas</span>
-            {isStaff && (
-              <button
-                onClick={() => setActiveView('moderacion')}
-                className="inline-flex items-center gap-1.5 text-xs text-[#333333] hover:text-[#000000] font-medium transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[#835500] text-[18px]">verified_user</span>
-                <span>Panel de moderación</span>
-              </button>
-            )}
+            <button
+              onClick={() => setActiveView('moderacion')}
+              className="inline-flex items-center gap-1.5 text-xs text-[#333333] hover:text-[#000000] font-medium transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[#835500] text-[18px]">verified_user</span>
+              <span>Políticas de seguridad</span>
+            </button>
           </div>
         </div>
       </footer>
 
       {/* Modals and Drawers */}
       <RecipeDetailModal
-        recipe={recipes.find((r) => r.id === selectedRecipeDetail?.id) || selectedRecipeDetail}
+        recipe={selectedRecipeDetail}
         onClose={() => setSelectedRecipeDetail(null)}
         onEditRecipe={handleEditRecipe}
         onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}
@@ -411,6 +394,13 @@ function AppContent() {
       <ShoppingCartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
+        onOpenMultiRecipe={() => setIsMultiRecipeOpen(true)}
+      />
+
+      <MultiRecipeShoppingModal
+        isOpen={isMultiRecipeOpen}
+        onClose={() => setIsMultiRecipeOpen(false)}
+        onOpenCart={() => setIsCartOpen(true)}
       />
 
       <AuthModals

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Recipe } from '../types';
 import { useApp } from '../context/AppContext';
-import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -16,7 +15,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 }) => {
   const {
     currentUser,
-    deleteRecipe,
     toggleLikeRecipe,
     toggleDislikeRecipe,
     toggleWishlist,
@@ -25,22 +23,19 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     addRecipeIngredientsToCart,
     togglePinRecipe,
     setPrintableRecipe,
-    exportRecipePdf,
     exportRecipeText,
     publishScheduledNow,
   } = useApp();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const isLiked = recipe.likedUserIds.includes(currentUser.id);
-  const isDisliked = recipe.dislikedUserIds.includes(currentUser.id);
-  const isInWishlist = currentUser.wishlistRecipeIds.includes(recipe.id);
+  const isLiked = currentUser ? recipe.likedUserIds.includes(currentUser.id) : false;
+  const isDisliked = currentUser ? recipe.dislikedUserIds.includes(currentUser.id) : false;
+  const isInWishlist = currentUser ? currentUser.wishlistRecipeIds.includes(recipe.id) : false;
   const isComparing = comparingRecipeIds.includes(recipe.id);
-  const isAuthor = recipe.authorId === currentUser.id;
-  const canPin = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
-  const canDelete = isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin';
+  const isAuthor = currentUser ? recipe.authorId === currentUser.id : false;
+  const canPin = currentUser ? (isAuthor || currentUser.role === 'editor' || currentUser.role === 'admin') : false;
 
   const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
 
@@ -86,8 +81,13 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             </span>
           )}
           {recipe.status === 'scheduled' && (
-            <span className="bg-[#835500] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-sm">
-              Programada
+            <span className="bg-[#835500] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px]">event_note</span>
+              <span>
+                {recipe.scheduledPublishDate
+                  ? `Prog. ${new Date(recipe.scheduledPublishDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+                  : 'Programada'}
+              </span>
             </span>
           )}
         </div>
@@ -302,16 +302,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      exportRecipePdf(recipe);
+                      exportRecipeText(recipe);
                       setMenuOpen(false);
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-stone-50 flex items-center gap-2 text-stone-700"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-stone-600">picture_as_pdf</span>
-                    <span>Descargar receta (PDF)</span>
+                    <span className="material-symbols-outlined text-[16px] text-stone-600">download</span>
+                    <span>Descargar texto</span>
                   </button>
 
-                  {recipe.status === 'scheduled' && isAuthor && (
+                  {recipe.status === 'scheduled' && (isAuthor || currentUser?.role === 'admin' || currentUser?.role === 'editor') && (
                     <button
                       type="button"
                       onClick={() => {
@@ -322,20 +322,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     >
                       <span className="material-symbols-outlined text-[16px]">schedule_send</span>
                       <span>Publicar ahora</span>
-                    </button>
-                  )}
-
-                  {canDelete && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setIsDeleteModalOpen(true);
-                      }}
-                      className="w-full px-3 py-2 text-left hover:bg-red-50 flex items-center gap-2 text-red-600 font-medium border-t border-stone-100"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                      <span>Eliminar receta</span>
                     </button>
                   )}
 
@@ -358,16 +344,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           </div>
         </div>
       </div>
-
-      <ConfirmDeleteRecipeModal
-        isOpen={isDeleteModalOpen}
-        recipeTitle={recipe.title}
-        onConfirm={() => {
-          deleteRecipe(recipe.id);
-          setIsDeleteModalOpen(false);
-        }}
-        onCancel={() => setIsDeleteModalOpen(false)}
-      />
     </article>
   );
 };
