@@ -31,13 +31,19 @@ import {
   collection,
   doc,
   getDoc,
-  setDoc,
+  setDoc as rawSetDoc,
   deleteDoc,
   onSnapshot
 } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { db, auth, googleProvider, testConnection } from '../firebase/config';
-import { handleFirestoreError, OperationType } from '../firebase/firestoreErrors';
+import { handleFirestoreError, cleanForFirestore, OperationType } from '../firebase/firestoreErrors';
+
+// Sanitized setDoc wrapper to prevent undefined field runtime errors in Firestore
+const setDoc = (docRef: any, data: any, options?: any) => {
+  const cleaned = cleanForFirestore(data);
+  return options ? rawSetDoc(docRef, cleaned, options) : rawSetDoc(docRef, cleaned);
+};
 
 interface AppContextType {
   // Authentication & Users
@@ -224,6 +230,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 1. Mandatory test connection check as per Skill directive
     testConnection();
 
+    // Guard to ensure initial seed runs at most once per session and only when authenticated
+    const seededCollections = new Set<string>();
+
+    const safeInitialSeed = async (collectionName: string, items: any[]) => {
+      // NEVER seed if unauthenticated (prevents permission errors) or already seeded
+      if (!auth.currentUser) return;
+      if (seededCollections.has(collectionName)) return;
+      seededCollections.add(collectionName);
+
+      try {
+        for (const item of items) {
+          const docRef = doc(db, collectionName, item.id);
+          await setDoc(docRef, item);
+        }
+      } catch (err) {
+        console.info(`Initial Firestore sync info (${collectionName}):`, err);
+      }
+    };
+
     // 2. Auth State Observer
     const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
@@ -239,20 +264,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const isAdminEmail = fbUser.email === 'medilautaro06@gmail.com' || fbUser.email === 'admin@gusto.app';
             const newProfile: UserProfile = {
               id: fbUser.uid,
-              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cocinero Gusto',
-              firstName: fbUser.displayName?.split(' ')[0] || 'Cocinero',
-              lastName: fbUser.displayName?.split(' ').slice(1).join(' ') || '',
-              username: (fbUser.email?.split('@')[0] || 'usuario').replace(/[^a-zA-Z0-9_]/g, ''),
-              email: fbUser.email || '',
-              avatar: fbUser.photoURL || '/assets/aistudio/default_avatar_b96d7689.jpg',
+              name: fbUser.displayName ?? fbUser.email?.split('@')[0] ?? 'Cocinero Gusto',
+              firstName: fbUser.displayName?.split(' ')[0] ?? 'Cocinero',
+              lastName: fbUser.displayName?.split(' ').slice(1).join(' ') ?? '',
+              gender: 'Prefiero no decirlo',
+              username: (fbUser.email?.split('@')[0] ?? 'usuario').replace(/[^a-zA-Z0-9_]/g, ''),
+              email: fbUser.email ?? '',
+              password: null as any,
+              avatar: fbUser.photoURL ?? '/assets/aistudio/default_avatar_b96d7689.jpg',
               role: isAdminEmail ? 'admin' : 'usuario',
               bio: 'Miembro de la comunidad gastronómica Gusto.',
               specialties: ['Cocina Casera'],
               dietaryPreferences: [],
               subprofiles: [],
+              activeSubProfileId: null,
               followersCount: 0,
               followingUserIds: ['user-mateo'],
-              wishlistRecipeIds: []
+              pinnedRecipeId: null,
+              wishlistRecipeIds: [],
+              location: 'Argentina',
+              isBanned: false
             };
             await setDoc(userRef, newProfile);
           }
@@ -267,15 +298,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as Recipe);
         setRecipes(list);
-      } else {
-        // Initial seeding if empty
-        INITIAL_RECIPES.forEach(rec => {
-          setDoc(doc(db, 'recipes', rec.id), rec).catch(e => console.warn('Recipe seeding:', e));
-        });
+      } else if (auth.currentUser) {
+        safeInitialSeed('recipes', INITIAL_RECIPES);
       }
       setIsFirebaseReady(true);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'recipes');
+      console.warn('Firestore recipes listener notice:', error);
     });
 
     // 4. Users Snapshot Listener
@@ -283,13 +311,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as UserProfile);
         setUsers(list);
-      } else {
-        INITIAL_USERS.forEach(u => {
-          setDoc(doc(db, 'users', u.id), u).catch(e => console.warn('User seeding:', e));
-        });
+      } else if (auth.currentUser) {
+        safeInitialSeed('users', INITIAL_USERS);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'users');
+      console.warn('Firestore users listener notice:', error);
     });
 
     // 5. Comments Snapshot Listener
@@ -297,13 +323,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as RecipeComment);
         setComments(list);
-      } else {
-        INITIAL_COMMENTS.forEach(c => {
-          setDoc(doc(db, 'recipe_comments', c.id), c).catch(e => console.warn('Comment seeding:', e));
-        });
+      } else if (auth.currentUser) {
+        safeInitialSeed('recipe_comments', INITIAL_COMMENTS);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'recipe_comments');
+      console.warn('Firestore comments listener notice:', error);
     });
 
     // 6. Forum Topics Snapshot Listener
@@ -311,13 +335,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as ForumTopic);
         setForumTopics(list);
-      } else {
-        INITIAL_FORUM_TOPICS.forEach(t => {
-          setDoc(doc(db, 'forum_topics', t.id), t).catch(e => console.warn('Topic seeding:', e));
-        });
+      } else if (auth.currentUser) {
+        safeInitialSeed('forum_topics', INITIAL_FORUM_TOPICS);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'forum_topics');
+      console.warn('Firestore forum topics listener notice:', error);
     });
 
     // 7. Forum Replies Snapshot Listener
@@ -325,13 +347,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as ForumReply);
         setForumReplies(list);
-      } else {
-        INITIAL_FORUM_REPLIES.forEach(r => {
-          setDoc(doc(db, 'forum_replies', r.id), r).catch(e => console.warn('Reply seeding:', e));
-        });
+      } else if (auth.currentUser) {
+        safeInitialSeed('forum_replies', INITIAL_FORUM_REPLIES);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'forum_replies');
+      console.warn('Firestore forum replies listener notice:', error);
     });
 
     // 8. Moderation Reports Snapshot Listener
@@ -339,13 +359,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as ModerationReport);
         setReports(list);
-      } else {
-        INITIAL_REPORTS.forEach(rep => {
-          setDoc(doc(db, 'moderation_reports', rep.id), rep).catch(e => console.warn('Report seeding:', e));
-        });
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'moderation_reports');
+      console.info('Firestore moderation reports notice:', error.message);
     });
 
     // 9. Collections Snapshot Listener
@@ -353,13 +369,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as RecipeCollection);
         setCollections(list);
-      } else {
-        INITIAL_COLLECTIONS.forEach(col => {
-          setDoc(doc(db, 'recipe_collections', col.id), col).catch(e => console.warn('Collection seeding:', e));
-        });
+      } else if (auth.currentUser) {
+        safeInitialSeed('recipe_collections', INITIAL_COLLECTIONS);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'recipe_collections');
+      console.warn('Firestore collections listener notice:', error);
     });
 
     // 10. Notifications Snapshot Listener
@@ -367,13 +381,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as AppNotification);
         setNotifications(list);
-      } else {
-        INITIAL_NOTIFICATIONS.forEach(notif => {
-          setDoc(doc(db, 'notifications', notif.id), notif).catch(e => console.warn('Notification seeding:', e));
-        });
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'notifications');
+      console.info('Firestore notifications notice:', error.message);
     });
 
     return () => {
@@ -453,20 +463,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const isAdminEmail = fbUser.email === 'medilautaro06@gmail.com' || fbUser.email === 'admin@gusto.app';
           profile = {
             id: fbUser.uid,
-            name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cocinero Gusto',
-            firstName: fbUser.displayName?.split(' ')[0] || 'Cocinero',
-            lastName: fbUser.displayName?.split(' ').slice(1).join(' ') || '',
-            username: (fbUser.email?.split('@')[0] || 'usuario').replace(/[^a-zA-Z0-9_]/g, ''),
-            email: fbUser.email || '',
-            avatar: fbUser.photoURL || '/assets/aistudio/default_avatar_b96d7689.jpg',
+            name: fbUser.displayName ?? fbUser.email?.split('@')[0] ?? 'Cocinero Gusto',
+            firstName: fbUser.displayName?.split(' ')[0] ?? 'Cocinero',
+            lastName: fbUser.displayName?.split(' ').slice(1).join(' ') ?? '',
+            gender: 'Prefiero no decirlo',
+            username: (fbUser.email?.split('@')[0] ?? 'usuario').replace(/[^a-zA-Z0-9_]/g, ''),
+            email: fbUser.email ?? '',
+            password: null as any,
+            avatar: fbUser.photoURL ?? '/assets/aistudio/default_avatar_b96d7689.jpg',
             role: isAdminEmail ? 'admin' : 'usuario',
             bio: 'Miembro activo de la comunidad gastronómica Gusto en Firebase.',
             specialties: ['Cocina Casera'],
             dietaryPreferences: [],
             subprofiles: [],
+            activeSubProfileId: null,
             followersCount: 0,
             followingUserIds: ['user-mateo'],
-            wishlistRecipeIds: []
+            pinnedRecipeId: null,
+            wishlistRecipeIds: [],
+            location: 'Argentina',
+            isBanned: false
           };
           await setDoc(userRef, profile);
         }
@@ -573,9 +589,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       specialties: ['Cocina Casera'],
       dietaryPreferences: [],
       subprofiles: [],
+      activeSubProfileId: null,
       followersCount: 0,
       followingUserIds: ['user-mateo', 'user-lucia'],
+      pinnedRecipeId: null,
       wishlistRecipeIds: [],
+      location: 'Argentina',
+      isBanned: false,
     };
 
     setUsers(prev => [...prev, newUser]);

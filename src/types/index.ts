@@ -35,9 +35,9 @@ export interface UserProfile {
   activeSubProfileId?: string | null;
   followersCount: number;
   followingUserIds: string[];
-  pinnedRecipeId?: string;
+  pinnedRecipeId?: string | null;
   wishlistRecipeIds: string[];
-  location?: string;
+  location?: string | null;
   isBanned?: boolean;
 }
 

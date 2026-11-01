@@ -74,7 +74,6 @@ export const INITIAL_USERS: UserProfile[] = [
     subprofiles: [],
     followersCount: 420,
     followingUserIds: ['user-mateo', 'user-lucia'],
-    pinnedRecipeId: undefined,
     wishlistRecipeIds: ['rec-3'],
   },
   {

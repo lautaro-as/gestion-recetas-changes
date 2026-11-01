@@ -46,3 +46,25 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+
+/**
+ * Recursively sanitizes objects and arrays for Firestore:
+ * - Converts any `undefined` values to `null` (since Firestore throws "Unsupported field value: undefined")
+ * - Traverses nested objects and arrays
+ */
+export function cleanForFirestore<T>(data: T): T {
+  if (data === undefined || data === null) {
+    return null as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => cleanForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, val] of Object.entries(data)) {
+      cleaned[key] = val === undefined ? null : cleanForFirestore(val);
+    }
+    return cleaned as T;
+  }
+  return data;
+}

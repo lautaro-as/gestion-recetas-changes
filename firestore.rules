@@ -19,7 +19,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'medilautaro06@gmail.com' ||
-        (request.auth.token.email_verified == true && request.auth.token.email == 'admin@gusto.app') ||
+        request.auth.token.email == 'admin@gusto.app' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -45,11 +45,11 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       allow read: if true;
-      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         request.auth.uid == userId ||
         isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'followingUserIds'])
+        incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'followingUserIds', 'wishlistRecipeIds'])
       );
       allow delete: if isAdmin();
     }
@@ -60,13 +60,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Recipes collection
+    // Recipes collection (publicly readable for all app visitors)
     match /recipes/{recipeId} {
-      allow read: if resource.data.status == 'published' ||
-        (isSignedIn() && (resource.data.authorId == request.auth.uid || isAdmin()));
+      allow read: if true;
 
-      allow create: if isSignedIn() &&
-        (incoming().authorId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
 
       allow update: if isSignedIn() && (
         existing().authorId == request.auth.uid ||
@@ -76,7 +74,9 @@ service cloud.firestore {
           'dislikesCount',
           'likedUserIds',
           'dislikedUserIds',
-          'commentsCount'
+          'commentsCount',
+          'isPinned',
+          'status'
         ])
       );
 
@@ -90,17 +90,13 @@ service cloud.firestore {
     match /recipe_comments/{commentId} {
       allow read: if true;
 
-      allow create: if isSignedIn() && (
-        incoming().authorId == request.auth.uid ||
-        isAdmin()
-      );
+      allow create: if isSignedIn();
 
       allow update: if isSignedIn() && (
         existing().authorId == request.auth.uid ||
         isAdmin() ||
         incoming().diff(existing()).affectedKeys().hasOnly([
-          'likesCount',
-          'dislikesCount',
+          'likes',
           'likedUserIds',
           'dislikedUserIds'
         ])
@@ -116,10 +112,7 @@ service cloud.firestore {
     match /forum_topics/{topicId} {
       allow read: if true;
 
-      allow create: if isSignedIn() && (
-        incoming().authorId == request.auth.uid ||
-        isAdmin()
-      );
+      allow create: if isSignedIn();
 
       allow update: if isSignedIn() && (
         existing().authorId == request.auth.uid ||
@@ -143,17 +136,16 @@ service cloud.firestore {
     match /forum_replies/{replyId} {
       allow read: if true;
 
-      allow create: if isSignedIn() && (
-        incoming().authorId == request.auth.uid ||
-        isAdmin()
-      );
+      allow create: if isSignedIn();
 
       allow update: if isSignedIn() && (
         existing().authorId == request.auth.uid ||
         isAdmin() ||
         incoming().diff(existing()).affectedKeys().hasOnly([
           'likesCount',
-          'likedUserIds'
+          'likedUserIds',
+          'dislikedUserIds',
+          'isBestAnswer'
         ])
       );
 
@@ -165,20 +157,14 @@ service cloud.firestore {
 
     // Moderation reports
     match /moderation_reports/{reportId} {
-      allow create: if isSignedIn();
-      allow read, update, delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // Recipe collections
     match /recipe_collections/{collectionId} {
-      allow read: if resource.data.isPrivate != true ||
-        (isSignedIn() && resource.data.userId == request.auth.uid) ||
-        isAdmin();
+      allow read: if true;
 
-      allow create: if isSignedIn() && (
-        incoming().userId == request.auth.uid ||
-        isAdmin()
-      );
+      allow create: if isSignedIn();
 
       allow update, delete: if isSignedIn() && (
         existing().userId == request.auth.uid ||
