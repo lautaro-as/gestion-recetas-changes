@@ -282,7 +282,8 @@ function AppContent() {
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-8 flex-1 w-full">
-        {/* VIEW 1: Explorar Recetas (Catálogo con filtros avanzados) */}
+        <ErrorBoundary>
+          {/* VIEW 1: Explorar Recetas (Catálogo con filtros avanzados) */}
         {activeView === 'explorar' && (
           <div className="space-y-6">
             {/* Hero / Title Header from Stitch */}
@@ -575,6 +576,7 @@ function AppContent() {
             </div>
           )
         )}
+        </ErrorBoundary>
       </main>
 
       {/* Footer from Stitch */}

@@ -44,13 +44,7 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        request.auth.uid == userId ||
-        isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'followingUserIds', 'wishlistRecipeIds'])
-      );
+      allow read, create, update: if true;
       allow delete: if isAdmin();
     }
 
@@ -60,99 +54,24 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Recipes collection (publicly readable for all app visitors)
+    // Recipes collection
     match /recipes/{recipeId} {
-      allow read: if true;
-
-      allow create: if isSignedIn();
-
-      allow update: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly([
-          'likesCount',
-          'dislikesCount',
-          'likedUserIds',
-          'dislikedUserIds',
-          'commentsCount',
-          'isPinned',
-          'status'
-        ])
-      );
-
-      allow delete: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, write: if true;
     }
 
     // Recipe comments and ratings
     match /recipe_comments/{commentId} {
-      allow read: if true;
-
-      allow create: if isSignedIn();
-
-      allow update: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly([
-          'likes',
-          'likedUserIds',
-          'dislikedUserIds'
-        ])
-      );
-
-      allow delete: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, write: if true;
     }
 
     // Forum topics
     match /forum_topics/{topicId} {
-      allow read: if true;
-
-      allow create: if isSignedIn();
-
-      allow update: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly([
-          'likesCount',
-          'likedUserIds',
-          'viewsCount',
-          'repliesCount',
-          'lastActivityAt'
-        ])
-      );
-
-      allow delete: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, write: if true;
     }
 
     // Forum replies
     match /forum_replies/{replyId} {
-      allow read: if true;
-
-      allow create: if isSignedIn();
-
-      allow update: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly([
-          'likesCount',
-          'likedUserIds',
-          'dislikedUserIds',
-          'isBestAnswer'
-        ])
-      );
-
-      allow delete: if isSignedIn() && (
-        existing().authorId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, write: if true;
     }
 
     // Moderation reports
@@ -162,29 +81,12 @@ service cloud.firestore {
 
     // Recipe collections
     match /recipe_collections/{collectionId} {
-      allow read: if true;
-
-      allow create: if isSignedIn();
-
-      allow update, delete: if isSignedIn() && (
-        existing().userId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, write: if true;
     }
 
     // Notifications
     match /notifications/{notificationId} {
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-
-      allow create: if isSignedIn();
-
-      allow update, delete: if isSignedIn() && (
-        existing().userId == request.auth.uid ||
-        isAdmin()
-      );
+      allow read, write: if true;
     }
   }
 }

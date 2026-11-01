@@ -5,6 +5,7 @@ import { RecipeCard } from './RecipeCard';
 import { ScrollableFilterBar } from './ScrollableFilterBar';
 import { ConfirmDeleteRecipeModal } from './ConfirmDeleteRecipeModal';
 import { Trash2, Camera, Upload } from 'lucide-react';
+import { resizeImageToThumbnail } from '../utils/imageUtils';
 
 interface UserProfileViewProps {
   onOpenDetail: (recipe: Recipe) => void;
@@ -66,8 +67,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     fileInputRef.current?.click();
   };
 
-  // Process chosen device image
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Process chosen device image with automatic client-side compression
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -76,16 +77,16 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        setAvatarPreview(dataUrl);
-        setIsEditingProfile(true);
-        showToast('Imagen seleccionada. Presiona "Guardar cambios" para actualizar tu foto de perfil.');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      showToast('Optimizando imagen...');
+      const compressedDataUrl = await resizeImageToThumbnail(file, 320, 0.82);
+      setAvatarPreview(compressedDataUrl);
+      setIsEditingProfile(true);
+      showToast('Foto lista. Presiona "Guardar cambios" para aplicarla a tu perfil.');
+    } catch (err) {
+      console.warn('Error optimizando foto de perfil:', err);
+      showToast('Hubo un problema al procesar la foto seleccionada.');
+    }
   };
 
   // Add subprofile state
@@ -132,18 +133,23 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 
   const handleProfileSave = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUserProfile({
-      name,
-      bio,
-      avatar: avatarPreview || currentUser.avatar,
-      specialties: specialtiesText
-        .split(',')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0),
-    });
-    setAvatarPreview(null);
-    setIsEditingProfile(false);
-    showToast('Perfil actualizado correctamente');
+    try {
+      updateUserProfile({
+        name: name.trim() || currentUser.name,
+        bio: bio.trim(),
+        avatar: avatarPreview || currentUser.avatar,
+        specialties: specialtiesText
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0),
+      });
+      setAvatarPreview(null);
+      setIsEditingProfile(false);
+      showToast('Perfil actualizado correctamente');
+    } catch (err) {
+      console.error('Error al guardar cambios de perfil:', err);
+      showToast('No se pudieron guardar todos los cambios del perfil.');
+    }
   };
 
   const handleAddSubProfileSubmit = (e: React.FormEvent) => {

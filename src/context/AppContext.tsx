@@ -185,7 +185,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return Boolean(savedUserId);
   });
 
-  const [users, setUsers] = useState<UserProfile[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<UserProfile[]>(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('gusto_custom_users_cache') || '[]');
+      if (Array.isArray(cached) && cached.length > 0) {
+        const merged = [...INITIAL_USERS];
+        for (const u of cached) {
+          if (!merged.some(m => m.id === u.id || m.email.toLowerCase() === u.email.toLowerCase())) {
+            merged.push(u);
+          }
+        }
+        return merged;
+      }
+    } catch {}
+    return INITIAL_USERS;
+  });
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
     const explicitlyLoggedOut = localStorage.getItem(STORAGE_KEYS.IS_LOGGED_OUT) === 'true';
     if (explicitlyLoggedOut) return '';
@@ -310,7 +324,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       if (!snapshot.empty) {
         const list = snapshot.docs.map(d => d.data() as UserProfile);
-        setUsers(list);
+        try {
+          const cached: UserProfile[] = JSON.parse(localStorage.getItem('gusto_custom_users_cache') || '[]');
+          const combined = [...list];
+          for (const cu of cached) {
+            if (!combined.some(u => u.id === cu.id || u.email.toLowerCase() === cu.email.toLowerCase())) {
+              combined.push(cu);
+            }
+          }
+          setUsers(combined);
+        } catch {
+          setUsers(list);
+        }
       } else if (auth.currentUser) {
         safeInitialSeed('users', INITIAL_USERS);
       }
@@ -493,9 +518,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return true;
       }
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google Sign-In Error:', error);
-      showToast('No se pudo completar el inicio de sesión con Google.');
+      if (error?.code === 'auth/unauthorized-domain') {
+        showToast('Dominio no autorizado: agrega gusto-recetas.vercel.app en Firebase Console > Authentication > Settings > Authorized domains');
+      } else if (error?.code === 'auth/popup-closed-by-user') {
+        showToast('Ventana de autenticación cerrada por el usuario.');
+      } else {
+        showToast('No se pudo completar el inicio de sesión con Google.');
+      }
       return false;
     }
   };
@@ -598,10 +629,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isBanned: false,
     };
 
-    setUsers(prev => [...prev, newUser]);
+    // Save locally
+    try {
+      const cached = JSON.parse(localStorage.getItem('gusto_custom_users_cache') || '[]');
+      localStorage.setItem('gusto_custom_users_cache', JSON.stringify([...cached.filter((u: any) => u.email.toLowerCase() !== cleanEmail), newUser]));
+    } catch {}
+
+    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
     setCurrentUserId(newUser.id);
     setIsAuthenticated(true);
     localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUser.id);
     sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUser.id);
 
     // Save to Firestore
