@@ -107,11 +107,11 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   );
 
   // Nutrition
-  const [calories, setCalories] = useState(recipeToEdit?.nutrition.calories || 320);
-  const [proteinG, setProteinG] = useState(recipeToEdit?.nutrition.proteinG || 12);
-  const [carbsG, setCarbsG] = useState(recipeToEdit?.nutrition.carbsG || 35);
-  const [fatG, setFatG] = useState(recipeToEdit?.nutrition.fatG || 14);
-  const [fiberG, setFiberG] = useState(recipeToEdit?.nutrition.fiberG || 5);
+  const [calories, setCalories] = useState(recipeToEdit?.nutrition?.calories || 320);
+  const [proteinG, setProteinG] = useState(recipeToEdit?.nutrition?.proteinG || 12);
+  const [carbsG, setCarbsG] = useState(recipeToEdit?.nutrition?.carbsG || 35);
+  const [fatG, setFatG] = useState(recipeToEdit?.nutrition?.fatG || 14);
+  const [fiberG, setFiberG] = useState(recipeToEdit?.nutrition?.fiberG || 5);
 
   useEffect(() => {
     if (isOpen) {

@@ -123,7 +123,7 @@ export const evaluateRF16Match = (
   }
 
   // Chequeo 2: INGREDIENTES ESPECÍFICOS
-  const matchedIngredients = recipe.ingredients.filter((ing) => {
+  const matchedIngredients = (recipe.ingredients || []).filter((ing) => {
     const normIng = normalizeText(ing.name);
     const normCat = normalizeText(ing.category);
     return queryTokens.some((token) => normIng.includes(token) || normCat.includes(token));
@@ -156,7 +156,7 @@ export const evaluateRF16Match = (
   }
 
   // Chequeo 4: PALABRAS CLAVE (descripción, pasos, técnicas, tips, etiquetas nutricionales/dietéticas)
-  const matchedSteps = recipe.steps.filter((s) => {
+  const matchedSteps = (recipe.steps || []).filter((s) => {
     const normStepTitle = normalizeText(s.title);
     const normStepDesc = normalizeText(s.description);
     const normStepTip = normalizeText(s.tip);
@@ -165,7 +165,7 @@ export const evaluateRF16Match = (
     );
   });
 
-  const matchedTags = recipe.tags.filter((t) => {
+  const matchedTags = (recipe.tags || []).filter((t) => {
     const normTag = normalizeText(t);
     return queryTokens.some((token) => normTag.includes(token));
   });

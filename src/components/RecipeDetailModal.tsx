@@ -111,19 +111,19 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
     recipe.coAuthors &&
       recipe.coAuthors.some(
         (ca) =>
-          ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
-          ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
-          (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
+          ca.toLowerCase().includes((currentUser?.name || '').toLowerCase()) ||
+          ca.toLowerCase().includes((currentUser?.username || '').toLowerCase()) ||
+          (ca.startsWith('@') && ca.slice(1).toLowerCase() === (currentUser?.username || '').toLowerCase())
       )
   );
-  const isStaff = currentUser.role === 'editor' || currentUser.role === 'admin';
+  const isStaff = currentUser?.role === 'editor' || currentUser?.role === 'admin';
   const canEdit = isAuthor || isCoAuthor || isStaff;
   const canDelete = isAuthor || isStaff;
-  const isFollowingAuthor = currentUser.followingUserIds.includes(recipe.authorId);
-  const isLiked = recipe.likedUserIds.includes(currentUser.id);
-  const isDisliked = recipe.dislikedUserIds.includes(currentUser.id);
-  const isInWishlist = currentUser.wishlistRecipeIds.includes(recipe.id);
-  const isComparing = comparingRecipeIds.includes(recipe.id);
+  const isFollowingAuthor = (currentUser?.followingUserIds || []).includes(recipe.authorId);
+  const isLiked = (recipe.likedUserIds || []).includes(currentUser?.id);
+  const isDisliked = (recipe.dislikedUserIds || []).includes(currentUser?.id);
+  const isInWishlist = (currentUser?.wishlistRecipeIds || []).includes(recipe.id);
+  const isComparing = (comparingRecipeIds || []).includes(recipe.id);
 
   const recipeComments = comments.filter((c) => c.recipeId === recipe.id);
   const rootComments = recipeComments.filter((c) => !c.parentCommentId);
@@ -296,7 +296,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/40 to-transparent flex flex-col justify-end p-6 text-white">
               <div className="flex flex-wrap gap-2 mb-2">
-                {recipe.tags.map((tag) => (
+                {(recipe.tags || []).map((tag) => (
                   <span
                     key={tag}
                     className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md uppercase tracking-wider text-amber-200 border border-white/20"
@@ -587,9 +587,9 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
               <Flame className="w-5 h-5 text-orange-600 shrink-0" />
               <div>
                 <div className="text-[11px] font-semibold text-stone-500 uppercase">Calorías / Porción</div>
-                <div className="text-sm font-bold text-stone-900">{recipe.nutrition.calories} kcal</div>
+                <div className="text-sm font-bold text-stone-900">{recipe.nutrition?.calories ?? 0} kcal</div>
                 <div className="text-[10px] text-stone-500">
-                  P: {recipe.nutrition.proteinG}g | C: {recipe.nutrition.carbsG}g
+                  P: {recipe.nutrition?.proteinG ?? 0}g | C: {recipe.nutrition?.carbsG ?? 0}g
                 </div>
               </div>
             </div>

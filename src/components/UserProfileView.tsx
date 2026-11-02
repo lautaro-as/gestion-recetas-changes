@@ -60,7 +60,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   // Edit profile state
   const [name, setName] = useState(currentUser.name);
   const [bio, setBio] = useState(currentUser.bio);
-  const [specialtiesText, setSpecialtiesText] = useState(currentUser.specialties.join(', '));
+  const [specialtiesText, setSpecialtiesText] = useState((currentUser.specialties || []).join(', '));
 
   // Trigger file explorer when avatar is clicked
   const handleAvatarClick = () => {
@@ -112,7 +112,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     });
   const myDrafts = recipes.filter((r) => r.authorId === currentUser.id && r.status === 'draft');
   const myScheduled = recipes.filter((r) => r.authorId === currentUser.id && r.status === 'scheduled');
-  const myWishlist = recipes.filter((r) => currentUser.wishlistRecipeIds.includes(r.id));
+  const myWishlist = recipes.filter((r) => (currentUser.wishlistRecipeIds || []).includes(r.id));
   const myCollections = collections.filter((c) => c.userId === currentUser.id);
 
   // Pinned recipe if exists
@@ -127,7 +127,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       u.username.toLowerCase().includes(cleanProfileQuery) ||
       `@${u.username.toLowerCase()}`.includes(rawProfileQuery) ||
       u.name.toLowerCase().includes(cleanProfileQuery) ||
-      u.specialties.some((s) => s.toLowerCase().includes(cleanProfileQuery))
+      (u.specialties || []).some((s) => s.toLowerCase().includes(cleanProfileQuery))
     );
   });
 
@@ -1379,7 +1379,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredUsers.map((user) => {
-              const isFollowing = currentUser.followingUserIds.includes(user.id);
+              const isFollowing = (currentUser.followingUserIds || []).includes(user.id);
 
               return (
                 <div

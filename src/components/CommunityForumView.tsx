@@ -691,7 +691,7 @@ export const CommunityForumView: React.FC = () => {
 
             <div className="flex flex-col gap-3.5">
               {allUsers.slice(0, 3).map((chef, idx) => {
-                const isFollowing = currentUser.followingUserIds.includes(chef.id);
+                const isFollowing = (currentUser.followingUserIds || []).includes(chef.id);
 
                 return (
                   <div key={chef.id} className="flex items-center justify-between gap-3">

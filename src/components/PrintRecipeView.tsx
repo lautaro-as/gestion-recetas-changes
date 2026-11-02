@@ -136,10 +136,10 @@ export const PrintRecipeView: React.FC<PrintRecipeViewProps> = ({
                 Nutrición (Por ración):
               </span>
               <div className="grid grid-cols-2 gap-1">
-                <span>Calorías: <strong>{recipe.nutrition.calories} kcal</strong></span>
-                <span>Proteínas: <strong>{recipe.nutrition.proteinG}g</strong></span>
-                <span>Carbohidratos: <strong>{recipe.nutrition.carbsG}g</strong></span>
-                <span>Grasas: <strong>{recipe.nutrition.fatG}g</strong></span>
+                <span>Calorías: <strong>{recipe.nutrition?.calories ?? 0} kcal</strong></span>
+                <span>Proteínas: <strong>{recipe.nutrition?.proteinG ?? 0}g</strong></span>
+                <span>Carbohidratos: <strong>{recipe.nutrition?.carbsG ?? 0}g</strong></span>
+                <span>Grasas: <strong>{recipe.nutrition?.fatG ?? 0}g</strong></span>
               </div>
             </div>
           </div>

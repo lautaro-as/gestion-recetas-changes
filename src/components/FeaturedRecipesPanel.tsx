@@ -35,7 +35,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
 
   // Filter mode
   if (filterMode === 'lowCal') {
-    list = [...list].sort((a, b) => a.nutrition.calories - b.nutrition.calories);
+    list = [...list].sort((a, b) => (a.nutrition?.calories ?? 0) - (b.nutrition?.calories ?? 0));
   } else {
     list = [...list].sort((a, b) => b.likesCount - a.likesCount);
   }
@@ -317,7 +317,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                 <div className="grid grid-cols-3 gap-2 p-3.5 rounded-2xl bg-[#F6F3F2] mb-6 text-center border border-stone-200/50">
                   <div>
                     <span className="block text-lg font-bold text-[#1B1C1C]">
-                      {spotlightRecipe.nutrition.calories}
+                      {spotlightRecipe?.nutrition?.calories ?? 0}
                     </span>
                     <span className="text-[10px] text-[#514536] uppercase font-bold tracking-wider">
                       Calorías
@@ -413,7 +413,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
         {podiumRecipes.map((recipe, index) => {
           const rank = index + 2;
           const totalTime = recipe.prepTimeMin + recipe.cookTimeMin;
-          const isInWish = currentUser.wishlistRecipeIds.includes(recipe.id);
+          const isInWish = (currentUser?.wishlistRecipeIds || []).includes(recipe.id);
 
           return (
             <article
@@ -491,7 +491,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                           toggleLikeRecipe(recipe.id);
                         }}
                         className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
-                          recipe.likedUserIds.includes(currentUser.id)
+                          (recipe.likedUserIds || []).includes(currentUser?.id)
                             ? 'text-[#835500] font-bold'
                             : 'text-[#1B1C1C] hover:text-[#835500]'
                         }`}
@@ -499,7 +499,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                       >
                         <span
                           className="material-symbols-outlined text-[17px] text-[#835500]"
-                          style={recipe.likedUserIds.includes(currentUser.id) ? { fontVariationSettings: "'FILL' 1" } : {}}
+                          style={(recipe.likedUserIds || []).includes(currentUser?.id) ? { fontVariationSettings: "'FILL' 1" } : {}}
                         >
                           thumb_up
                         </span>
@@ -512,7 +512,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                           toggleDislikeRecipe(recipe.id);
                         }}
                         className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                          recipe.dislikedUserIds.includes(currentUser.id)
+                          (recipe.dislikedUserIds || []).includes(currentUser?.id)
                             ? 'text-[#AB3333] font-bold'
                             : 'hover:text-[#AB3333]'
                         }`}
@@ -520,7 +520,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                       >
                         <span
                           className="material-symbols-outlined text-[16px]"
-                          style={recipe.dislikedUserIds.includes(currentUser.id) ? { fontVariationSettings: "'FILL' 1" } : {}}
+                          style={(recipe.dislikedUserIds || []).includes(currentUser?.id) ? { fontVariationSettings: "'FILL' 1" } : {}}
                         >
                           thumb_down
                         </span>
@@ -532,7 +532,7 @@ export const FeaturedRecipesPanel: React.FC<FeaturedRecipesPanelProps> = ({
                       <span className="material-symbols-outlined text-[16px] text-[#835500]">
                         local_fire_department
                       </span>
-                      {recipe.nutrition.calories} kcal
+                      {recipe.nutrition?.calories ?? 0} kcal
                     </div>
                   </div>
 

@@ -41,7 +41,7 @@ export const PublicProfileModal: React.FC<PublicProfileModalProps> = ({
   const user = allUsers.find((u) => u.id === initialUser.id) || initialUser;
 
   const isCurrentUser = user.id === currentUser.id;
-  const isFollowing = currentUser.followingUserIds.includes(user.id);
+  const isFollowing = (currentUser.followingUserIds || []).includes(user.id);
 
   // User's published recipes
   const userRecipes = recipes.filter(

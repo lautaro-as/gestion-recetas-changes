@@ -46,13 +46,13 @@ export const RecipeCompareView: React.FC<RecipeCompareViewProps> = ({
     if (comparedRecipes.length < 2) return null;
 
     // Caloric differences
-    const sortedByCalories = [...comparedRecipes].sort((a, b) => a.nutrition.calories - b.nutrition.calories);
+    const sortedByCalories = [...comparedRecipes].sort((a, b) => (a.nutrition?.calories ?? 0) - (b.nutrition?.calories ?? 0));
     const lowestCal = sortedByCalories[0];
     const highestCal = sortedByCalories[sortedByCalories.length - 1];
-    const calDiff = highestCal.nutrition.calories - lowestCal.nutrition.calories;
+    const calDiff = (highestCal.nutrition?.calories ?? 0) - (lowestCal.nutrition?.calories ?? 0);
 
     // Protein differences
-    const sortedByProtein = [...comparedRecipes].sort((a, b) => b.nutrition.proteinG - a.nutrition.proteinG);
+    const sortedByProtein = [...comparedRecipes].sort((a, b) => (b.nutrition?.proteinG ?? 0) - (a.nutrition?.proteinG ?? 0));
     const highestProtein = sortedByProtein[0];
 
     // Cooking time differences
@@ -250,7 +250,7 @@ export const RecipeCompareView: React.FC<RecipeCompareViewProps> = ({
                 </h4>
                 <div className="flex items-baseline gap-1.5 mt-1">
                   <span className="text-xl font-bold text-emerald-600">
-                    {differences.lowestCal.nutrition.calories} kcal
+                    {differences.lowestCal.nutrition?.calories ?? 0} kcal
                   </span>
                   {differences.calDiff > 0 && (
                     <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-md">
@@ -275,7 +275,7 @@ export const RecipeCompareView: React.FC<RecipeCompareViewProps> = ({
                 </h4>
                 <div className="flex items-baseline gap-1.5 mt-1">
                   <span className="text-xl font-bold text-amber-700">
-                    {differences.highestProtein.nutrition.proteinG}g
+                    {differences.highestProtein.nutrition?.proteinG ?? 0}g
                   </span>
                   <span className="text-[11px] font-medium text-stone-500">por porción</span>
                 </div>
@@ -490,23 +490,23 @@ export const RecipeCompareView: React.FC<RecipeCompareViewProps> = ({
                     <div className="space-y-1.5 text-xs">
                       <div className="flex justify-between items-center py-0.5 border-b border-stone-200/60">
                         <span className="text-stone-600">Calorías:</span>
-                        <strong className="text-stone-900 text-sm">{recipe.nutrition.calories} kcal</strong>
+                        <strong className="text-stone-900 text-sm">{recipe.nutrition?.calories ?? 0} kcal</strong>
                       </div>
                       <div className="flex justify-between items-center py-0.5 border-b border-stone-200/60">
                         <span className="text-stone-600">Proteínas:</span>
-                        <strong className="text-stone-900">{recipe.nutrition.proteinG} g</strong>
+                        <strong className="text-stone-900">{recipe.nutrition?.proteinG ?? 0} g</strong>
                       </div>
                       <div className="flex justify-between items-center py-0.5 border-b border-stone-200/60">
                         <span className="text-stone-600">Carbohidratos:</span>
-                        <strong className="text-stone-900">{recipe.nutrition.carbsG} g</strong>
+                        <strong className="text-stone-900">{recipe.nutrition?.carbsG ?? 0} g</strong>
                       </div>
                       <div className="flex justify-between items-center py-0.5 border-b border-stone-200/60">
                         <span className="text-stone-600">Grasas:</span>
-                        <strong className="text-stone-900">{recipe.nutrition.fatG} g</strong>
+                        <strong className="text-stone-900">{recipe.nutrition?.fatG ?? 0} g</strong>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-stone-600">Fibra dietética:</span>
-                        <strong className="text-stone-900">{recipe.nutrition.fiberG} g</strong>
+                        <strong className="text-stone-900">{recipe.nutrition?.fiberG ?? 0} g</strong>
                       </div>
                     </div>
                   </div>

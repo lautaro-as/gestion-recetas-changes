@@ -38,21 +38,21 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   const [cartSuccess, setCartSuccess] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const isLiked = recipe.likedUserIds.includes(currentUser.id);
-  const isDisliked = recipe.dislikedUserIds.includes(currentUser.id);
-  const isInWishlist = currentUser.wishlistRecipeIds.includes(recipe.id);
-  const isComparing = comparingRecipeIds.includes(recipe.id);
-  const isAuthor = recipe.authorId === currentUser.id;
+  const isLiked = (recipe.likedUserIds || []).includes(currentUser?.id);
+  const isDisliked = (recipe.dislikedUserIds || []).includes(currentUser?.id);
+  const isInWishlist = (currentUser?.wishlistRecipeIds || []).includes(recipe.id);
+  const isComparing = (comparingRecipeIds || []).includes(recipe.id);
+  const isAuthor = recipe.authorId === currentUser?.id;
   const isCoAuthor = Boolean(
     recipe.coAuthors &&
       recipe.coAuthors.some(
         (ca) =>
-          ca.toLowerCase().includes(currentUser.name.toLowerCase()) ||
-          ca.toLowerCase().includes(currentUser.username.toLowerCase()) ||
-          (ca.startsWith('@') && ca.slice(1).toLowerCase() === currentUser.username.toLowerCase())
+          ca.toLowerCase().includes((currentUser?.name || '').toLowerCase()) ||
+          ca.toLowerCase().includes((currentUser?.username || '').toLowerCase()) ||
+          (ca.startsWith('@') && ca.slice(1).toLowerCase() === (currentUser?.username || '').toLowerCase())
       )
   );
-  const isStaff = currentUser.role === 'editor' || currentUser.role === 'admin';
+  const isStaff = currentUser?.role === 'editor' || currentUser?.role === 'admin';
   const canEdit = isAuthor || isCoAuthor || isStaff;
   const canPin = isAuthor || isStaff;
   const canDelete = isAuthor || isStaff;
@@ -162,8 +162,8 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         <div>
           {/* Author info & Dietary tags */}
           <div className="flex items-center justify-between text-xs text-[#714500] mb-1.5 font-medium">
-            <span className="truncate">Por {recipe.authorName}</span>
-            <span className="text-[#837564] text-[11px]">{recipe.category.toUpperCase()}</span>
+            <span className="truncate">Por {recipe.authorName || 'Chef'}</span>
+            <span className="text-[#837564] text-[11px]">{(recipe.category || 'General').toUpperCase()}</span>
           </div>
 
           <h2
@@ -178,9 +178,9 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
           </p>
 
           {/* Dietary tags row */}
-          {recipe.tags.length > 0 && (
+          {(recipe.tags || []).length > 0 && (
             <div className="flex flex-wrap gap-1 mb-3">
-              {recipe.tags.slice(0, 3).map((tag) => (
+              {(recipe.tags || []).slice(0, 3).map((tag) => (
                 <span
                   key={tag}
                   className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFDDB9] text-[#714500]"
@@ -188,9 +188,9 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   #{tag}
                 </span>
               ))}
-              {recipe.tags.length > 3 && (
+              {(recipe.tags || []).length > 3 && (
                 <span className="px-1.5 py-0.5 rounded-full text-[10px] text-stone-400">
-                  +{recipe.tags.length - 3}
+                  +{(recipe.tags || []).length - 3}
                 </span>
               )}
             </div>
@@ -264,7 +264,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
               <span className="material-symbols-outlined text-[14px] text-[#E09F3E]">
                 local_fire_department
               </span>
-              {recipe.nutrition.calories} kcal
+              {recipe.nutrition?.calories ?? 0} kcal
             </span>
           </div>
 

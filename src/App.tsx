@@ -103,12 +103,19 @@ function AppContent() {
     const rawQ = searchQuery.trim();
     if (!rawQ) return [];
     const cleanQ = normalizeText(rawQ.replace(/^@/, ''));
+    const seen = new Set<string>();
     return allUsers.filter((u) => {
-      const matchUsername = normalizeText(u.username).includes(cleanQ);
-      const matchAlias = `@${normalizeText(u.username)}`.includes(normalizeText(rawQ));
-      const matchName = normalizeText(u.name).includes(cleanQ);
-      const matchSpecialty = u.specialties.some((s) => normalizeText(s).includes(cleanQ));
-      return matchUsername || matchAlias || matchName || matchSpecialty;
+      if (!u?.id || seen.has(u.id)) return false;
+      const matchUsername = normalizeText(u.username || '').includes(cleanQ);
+      const matchAlias = `@${normalizeText(u.username || '')}`.includes(normalizeText(rawQ));
+      const matchName = normalizeText(u.name || '').includes(cleanQ);
+      const matchSpecialty = (u.specialties || []).some((s) => normalizeText(s).includes(cleanQ));
+      const isMatch = matchUsername || matchAlias || matchName || matchSpecialty;
+      if (isMatch) {
+        seen.add(u.id);
+        return true;
+      }
+      return false;
     });
   }, [allUsers, searchQuery]);
 
@@ -136,7 +143,7 @@ function AppContent() {
 
   // RF-16: Filtrado exhaustivo por palabras clave, ingredientes específicos, título o categoría general
   const filteredRecipesWithMeta = useMemo(() => {
-    return recipes
+    const list = recipes
       .filter((recipe) => {
         // If exploring, hide drafts unless current user is author
         if (recipe.status === 'draft' && recipe.authorId !== currentUser.id) {
@@ -165,7 +172,7 @@ function AppContent() {
 
         // Dietary tags filter (vegetarian, vegan, celiac, diabetic, keto...)
         if (selectedTags.length > 0) {
-          const hasAllTags = selectedTags.every((tag) => recipe.tags.includes(tag));
+          const hasAllTags = selectedTags.every((tag) => (recipe.tags || []).includes(tag));
           if (!hasAllTags) return false;
         }
 
@@ -195,12 +202,20 @@ function AppContent() {
         };
       })
       .sort((a, b) => {
-        if (sortBy === 'popular') return b.recipe.likesCount - a.recipe.likesCount;
+        if (sortBy === 'popular') return (b.recipe.likesCount || 0) - (a.recipe.likesCount || 0);
         if (sortBy === 'recent') return new Date(b.recipe.createdAt).getTime() - new Date(a.recipe.createdAt).getTime();
         if (sortBy === 'time') return (a.recipe.prepTimeMin + a.recipe.cookTimeMin) - (b.recipe.prepTimeMin + b.recipe.cookTimeMin);
-        if (sortBy === 'calories') return a.recipe.nutrition.calories - b.recipe.nutrition.calories;
+        if (sortBy === 'calories') return (a.recipe.nutrition?.calories ?? 0) - (b.recipe.nutrition?.calories ?? 0);
         return 0;
       });
+
+    // Ensure unique recipe items
+    const seenRecipeIds = new Set<string>();
+    return list.filter((item) => {
+      if (!item.recipe?.id || seenRecipeIds.has(item.recipe.id)) return false;
+      seenRecipeIds.add(item.recipe.id);
+      return true;
+    });
   }, [
     recipes,
     searchQuery,
@@ -356,15 +371,15 @@ function AppContent() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {matchedUsers.map((user) => {
-                    const isFollowing = currentUser.followingUserIds.includes(user.id);
+                  {matchedUsers.map((user, idx) => {
+                    const isFollowing = (currentUser.followingUserIds || []).includes(user.id);
                     const userRecipeCount = recipes.filter(
                       (r) => r.authorId === user.id && r.status === 'published'
                     ).length;
 
                     return (
                       <div
-                        key={user.id}
+                        key={user.id ? `${user.id}-${idx}` : `user-${idx}`}
                         className="p-4 rounded-2xl bg-stone-50 hover:bg-[#FFFDF9] border border-stone-200 hover:border-[#E09F3E] transition-all flex flex-col justify-between gap-3 group shadow-2xs"
                       >
                         <div
@@ -476,9 +491,9 @@ function AppContent() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {filteredRecipesWithMeta.map((item) => (
+                  {filteredRecipesWithMeta.map((item, idx) => (
                     <RecipeCard
-                      key={item.recipe.id}
+                      key={item.recipe.id ? `${item.recipe.id}-${idx}` : `recipe-${idx}`}
                       recipe={item.recipe}
                       onOpenDetail={(r) => setSelectedRecipeDetail(r)}
                       onOpenReport={(r) => handleOpenReport('recipe', r.id, r.title)}

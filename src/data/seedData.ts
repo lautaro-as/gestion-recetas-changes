@@ -879,6 +879,177 @@ export const INITIAL_RECIPES: Recipe[] = [
     ]
   },
   {
+    id: 'rec-8',
+    title: 'Empanadas Criollas Salteñas Cortadas a Cuchillo',
+    description: 'Receta tradicional del norte argentino: carne de lomo cortada a cuchillo, comino en grano, cebolla de verdeo fresca, huevo duro y pimentón dulce.',
+    coverImage: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=800&auto=format&fit=crop&q=80',
+    authorId: 'user-juan',
+    authorName: 'Juan Pérez',
+    authorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80',
+    coAuthors: [],
+    status: 'published',
+    createdAt: '2026-09-18T14:00:00.000Z',
+    updatedAt: '2026-09-18T14:00:00.000Z',
+    prepTimeMin: 45,
+    cookTimeMin: 20,
+    servings: 6,
+    difficulty: 'media',
+    category: 'platos_fuertes',
+    tags: [],
+    isFeaturedDay: false,
+    isFeaturedWeek: true,
+    likesCount: 184,
+    dislikesCount: 2,
+    likedUserIds: ['user-mateo', 'user-camila'],
+    dislikedUserIds: [],
+    commentsCount: 8,
+    nutrition: { calories: 340, proteinG: 18, carbsG: 28, fatG: 16, fiberG: 2 },
+    ingredients: [
+      {
+        id: 'ing-emp-1',
+        name: 'Lomo o bola de lomo vacuna',
+        quantity: 600,
+        unit: 'g',
+        estimatedPrice: 6500,
+        storeName: 'Carnicería La Tradición',
+        storeLocation: 'Av. Corrientes 4500, Almagro',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'frescos'
+      },
+      {
+        id: 'ing-emp-2',
+        name: 'Cebolla de verdeo fresca',
+        quantity: 300,
+        unit: 'g',
+        estimatedPrice: 1200,
+        storeName: 'Verdulería del Barrio',
+        storeLocation: 'Thames 1420, Palermo',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'frescos'
+      },
+      {
+        id: 'ing-emp-3',
+        name: 'Grasa vacuna refinada o manteca',
+        quantity: 80,
+        unit: 'g',
+        estimatedPrice: 850,
+        storeName: 'Coto Digital',
+        storeLocation: 'Av. Cabildo 545, Belgrano',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'otros'
+      }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: 'Picado a cuchillo y sellado breve',
+        description: 'Cortar la carne en cubitos pequeños de medio centímetro. Rehogar la cebolla picada en grasa tibia y agregar la carne con fuego fuerte por solo 3 minutos.',
+        durationMinutes: 20,
+        tip: 'No cocinar la carne de más en la sartén; debe terminar de cocinarse jugosa dentro de la masa en el horno.'
+      },
+      {
+        stepNumber: 2,
+        title: 'Condimentado norteño y reposo en frío',
+        description: 'Agregar pimentón dulce, comino recién molido, ají molido y sal gruesa disuelta. Dejar enfriar por completo.',
+        durationMinutes: 15
+      },
+      {
+        stepNumber: 3,
+        title: 'Repulgue y horneado',
+        description: 'Armar los discos, agregar huevo picado y verdeo fresco crudo. Repulgar con 13 pliegues tradicionales y hornear a 240°C por 12-15 minutos.',
+        durationMinutes: 15
+      }
+    ]
+  },
+  {
+    id: 'rec-9',
+    title: 'Risotto Mediterráneo de Langostinos y Hebras de Azafrán',
+    description: 'Arroz Carnaroli mantecado con caldo de mariscos reducido, langostinos sellados al oliva, vino blanco Torrontés y azafrán español. Elegante maridaje costero.',
+    coverImage: 'https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?w=800&auto=format&fit=crop&q=80',
+    authorId: 'user-julia',
+    authorName: 'Julia Domínguez',
+    authorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=160&auto=format&fit=crop&q=80',
+    coAuthors: ['Mateo Rossi'],
+    status: 'published',
+    createdAt: '2026-09-21T20:30:00.000Z',
+    updatedAt: '2026-09-21T20:30:00.000Z',
+    prepTimeMin: 20,
+    cookTimeMin: 25,
+    servings: 4,
+    difficulty: 'dificil',
+    category: 'platos_fuertes',
+    tags: ['celiaco'],
+    isFeaturedMonth: true,
+    likesCount: 245,
+    dislikesCount: 3,
+    likedUserIds: ['user-mateo', 'user-lucia', 'user-juan'],
+    dislikedUserIds: [],
+    commentsCount: 11,
+    nutrition: { calories: 420, proteinG: 22, carbsG: 52, fatG: 14, fiberG: 3 },
+    ingredients: [
+      {
+        id: 'ing-ris-1',
+        name: 'Arroz Carnaroli o Arborio italiano',
+        quantity: 320,
+        unit: 'g',
+        estimatedPrice: 3400,
+        storeName: 'Jumbo Hipermercado',
+        storeLocation: 'Av. Santa Fe 3253, Palermo',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'secos'
+      },
+      {
+        id: 'ing-ris-2',
+        name: 'Colas de langostinos limpios',
+        quantity: 300,
+        unit: 'g',
+        estimatedPrice: 7800,
+        storeName: 'Pescadería del Puerto',
+        storeLocation: 'Paseo Costero 112',
+        inStock: true,
+        stockLevel: 'medio',
+        category: 'frescos'
+      },
+      {
+        id: 'ing-ris-3',
+        name: 'Hebras de azafrán puro en cápsula',
+        quantity: 1,
+        unit: 'g',
+        estimatedPrice: 3200,
+        storeName: 'Supermercado Central Gourmet',
+        storeLocation: 'Av. Libertador 880',
+        inStock: true,
+        stockLevel: 'alto',
+        category: 'secos'
+      }
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        title: 'Tostado del arroz y desglasado',
+        description: 'Nacarar el arroz en manteca y echalotes picados por 2 minutos. Desglasar con vino blanco seco hasta evaporar alcohol.',
+        durationMinutes: 8,
+        tip: 'El grano debe sentirse caliente al tacto antes de verter el vino.'
+      },
+      {
+        stepNumber: 2,
+        title: 'Cocción paulatina con infusión de azafrán',
+        description: 'Añadir el fumet hirviendo cucharón a cucharón, removiendo con cuchara de madera. Disolver el azafrán a mitad de cocción.',
+        durationMinutes: 14
+      },
+      {
+        stepNumber: 3,
+        title: 'Mantecatura all’onda y emplatado con langostinos',
+        description: 'Retirar del fuego, mantecar con dados de manteca fría y parmesano. Servir cremoso con los langostinos dorados por encima.',
+        durationMinutes: 5
+      }
+    ]
+  },
+  {
     id: 'rec-spam-example',
     title: 'Receta Mágica Quemagrasas en 24 Horas sin Esfuerzo',
     description: 'Píldoras y menjunje milagroso para acelerar el metabolismo sin ejercicio ni cambios dietéticos. Enlaces a suplementos dudosos.',
