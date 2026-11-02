@@ -70,7 +70,9 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
     exportRecipeText,
     publishScheduledNow,
     changeRecipeStatus,
-    showToast
+    showToast,
+    isAuthenticated,
+    promptAuthRequired
   } = useApp();
 
   const [commentText, setCommentText] = useState('');
@@ -81,6 +83,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   const [selectedIngredientIds, setSelectedIngredientIds] = useState<string[]>([]);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [inlineScheduledDate, setInlineScheduledDate] = useState(() => {
     return new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16);
@@ -143,18 +146,30 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   };
 
   const handleAddSelectedToCart = () => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Debes iniciar sesión para agregar ingredientes al carrito de compras.');
+      return;
+    }
     const ids = selectedIngredientIds.length > 0 ? selectedIngredientIds : undefined;
     addRecipeIngredientsToCart(recipe, ids);
   };
 
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      promptAuthRequired('Debes iniciar sesión para publicar un comentario.');
+      return;
+    }
     if (!commentText.trim()) return;
     addComment(recipe.id, commentText);
     setCommentText('');
   };
 
   const handleReplySubmit = (parentId: string) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Debes iniciar sesión para responder a este comentario.');
+      return;
+    }
     if (!replyText.trim()) return;
     addComment(recipe.id, replyText, parentId);
     setReplyText('');
@@ -210,7 +225,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
-              onClick={() => toggleWishlist(recipe.id)}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  promptAuthRequired('Debes iniciar sesión para guardar recetas en tu lista de deseos.');
+                  return;
+                }
+                toggleWishlist(recipe.id);
+              }}
               title={isInWishlist ? 'Quitar de lista de deseos' : 'Guardar en deseos'}
               className={`p-2 rounded-xl transition-colors cursor-pointer ${
                 isInWishlist ? 'bg-amber-100 text-amber-800' : 'text-stone-600 hover:bg-stone-100'
@@ -238,7 +259,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
             </button>
 
             <button
-              onClick={() => exportRecipePdf(recipe)}
+              onClick={() => setIsDownloadModalOpen(true)}
               title="Descargar receta en formato PDF (Lectura rápida)"
               className="p-2 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
             >
@@ -269,7 +290,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
             )}
 
             <button
-              onClick={() => onOpenReport(recipe)}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  promptAuthRequired('Debes iniciar sesión para denunciar una receta.');
+                  return;
+                }
+                onOpenReport(recipe);
+              }}
               title="Denunciar receta"
               className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
             >
@@ -405,23 +432,24 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
 
               {/* Inline Schedule Date Picker */}
               {showDatePicker && (
-                <div className="pt-3 border-t border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-                    <span className="text-xs font-bold text-stone-700 shrink-0">
+                <div className="w-full mt-3 p-4 bg-white rounded-2xl border border-amber-300 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
+                    <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5 shrink-0">
+                      <span className="material-symbols-outlined text-amber-600 text-[18px]">calendar_clock</span>
                       Fecha y hora de publicación:
                     </span>
                     <input
                       type="datetime-local"
                       value={inlineScheduledDate}
                       onChange={(e) => setInlineScheduledDate(e.target.value)}
-                      className="px-3 py-1.5 rounded-xl border border-stone-300 text-xs font-semibold text-stone-800 focus:ring-2 focus:ring-[#E09F3E] outline-hidden"
+                      className="w-full sm:w-auto px-3.5 py-2 rounded-xl border border-stone-300 text-xs font-semibold text-stone-800 focus:ring-2 focus:ring-[#E09F3E] outline-hidden bg-white shadow-2xs"
                     />
                   </div>
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex items-center justify-end gap-2 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-stone-100">
                     <button
                       type="button"
                       onClick={() => setShowDatePicker(false)}
-                      className="px-3 py-1.5 text-xs text-stone-500 hover:text-stone-800 font-semibold cursor-pointer"
+                      className="px-3.5 py-2 text-xs text-stone-500 hover:text-stone-800 font-semibold cursor-pointer rounded-xl hover:bg-stone-100 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -431,9 +459,9 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
                         changeRecipeStatus(recipe.id, 'scheduled', inlineScheduledDate);
                         setShowDatePicker(false);
                       }}
-                      className="px-4 py-1.5 bg-[#E09F3E] hover:bg-[#835500] text-white rounded-full text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1 transition-colors"
+                      className="px-4 py-2 bg-[#E09F3E] hover:bg-[#835500] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-[15px]">event_available</span>
+                      <span className="material-symbols-outlined text-[16px]">event_available</span>
                       <span>Confirmar Programación</span>
                     </button>
                   </div>
@@ -509,7 +537,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
             <div className="flex items-center gap-3">
               {recipe.authorId !== currentUser.id && (
                 <button
-                  onClick={() => followUserToggle(recipe.authorId)}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      promptAuthRequired('Debes iniciar sesión para seguir a otros cocineros.');
+                      return;
+                    }
+                    followUserToggle(recipe.authorId);
+                  }}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     isFollowingAuthor
                       ? 'bg-stone-200 text-stone-800 hover:bg-stone-300'
@@ -836,32 +870,48 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
               </span>
             </div>
 
-            {/* Comment Form */}
-            <form onSubmit={handleCommentSubmit} className="flex gap-3">
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-9 h-9 rounded-full object-cover shrink-0"
-              />
-              <div className="flex-1 space-y-2">
-                <textarea
-                  rows={2}
-                  required
-                  placeholder={`Escribe un comentario como ${currentUser.name}...`}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl border border-stone-300 text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden resize-none"
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs transition-colors shadow-xs"
-                  >
-                    Publicar Comentario
-                  </button>
+            {/* Comment Form or Guest Auth Banner */}
+            {!isAuthenticated ? (
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#FFDDB9]/30 border border-[#E09F3E]/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                <div>
+                  <h4 className="text-sm font-bold text-stone-900">¿Quieres dejar tu comentario o consejo culinario?</h4>
+                  <p className="text-xs text-stone-600 mt-0.5">Inicia sesión con tu cuenta de Gusto para compartir tus experiencias con la comunidad.</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => promptAuthRequired('Inicia sesión para publicar un comentario.')}
+                  className="px-5 py-2.5 bg-[#E09F3E] hover:bg-[#835500] text-white text-xs font-bold rounded-xl shadow-xs transition-all whitespace-nowrap cursor-pointer shrink-0"
+                >
+                  Iniciar Sesión
+                </button>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleCommentSubmit} className="flex gap-3">
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-9 h-9 rounded-full object-cover shrink-0"
+                />
+                <div className="flex-1 space-y-2">
+                  <textarea
+                    rows={2}
+                    required
+                    placeholder={`Escribe un comentario como ${currentUser.name}...`}
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-stone-300 text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:outline-hidden resize-none"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs transition-colors shadow-xs"
+                    >
+                      Publicar Comentario
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
 
             {/* Comments List */}
             <div className="space-y-4">
@@ -915,7 +965,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setReplyingToId(replyingToId === comment.id ? null : comment.id)}
+                            onClick={() => {
+                              if (!isAuthenticated) {
+                                promptAuthRequired('Debes iniciar sesión para responder a este comentario.');
+                                return;
+                              }
+                              setReplyingToId(replyingToId === comment.id ? null : comment.id);
+                            }}
                             className="text-xs text-[#835500] hover:underline font-semibold cursor-pointer"
                           >
                             Responder
@@ -990,7 +1046,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
                       <div className="pl-10 flex items-center gap-1.5 pt-1">
                         <button
                           type="button"
-                          onClick={() => toggleCommentVote(comment.id, 'like')}
+                          onClick={() => {
+                            if (!isAuthenticated) {
+                              promptAuthRequired('Debes iniciar sesión para votar en comentarios.');
+                              return;
+                            }
+                            toggleCommentVote(comment.id, 'like');
+                          }}
                           title="Voto positivo / Like"
                           className={`p-1 rounded-md transition-colors cursor-pointer flex items-center justify-center ${
                             isUpvoted
@@ -1015,7 +1077,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => toggleCommentVote(comment.id, 'dislike')}
+                          onClick={() => {
+                            if (!isAuthenticated) {
+                              promptAuthRequired('Debes iniciar sesión para votar en comentarios.');
+                              return;
+                            }
+                            toggleCommentVote(comment.id, 'dislike');
+                          }}
                           title="Voto negativo / Dislike"
                           className={`p-1 rounded-md transition-colors cursor-pointer flex items-center justify-center ${
                             isDownvoted
@@ -1153,7 +1221,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
                                 <div className="pl-8 flex items-center gap-1.5 pt-0.5">
                                   <button
                                     type="button"
-                                    onClick={() => toggleCommentVote(reply.id, 'like')}
+                                    onClick={() => {
+                                      if (!isAuthenticated) {
+                                        promptAuthRequired('Debes iniciar sesión para votar en comentarios.');
+                                        return;
+                                      }
+                                      toggleCommentVote(reply.id, 'like');
+                                    }}
                                     className={`p-0.5 rounded transition-colors ${
                                       isRepUpvoted ? 'text-[#835500] font-bold' : 'text-stone-400 hover:text-[#835500]'
                                     }`}
@@ -1173,7 +1247,13 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={() => toggleCommentVote(reply.id, 'dislike')}
+                                    onClick={() => {
+                                      if (!isAuthenticated) {
+                                        promptAuthRequired('Debes iniciar sesión para votar en comentarios.');
+                                        return;
+                                      }
+                                      toggleCommentVote(reply.id, 'dislike');
+                                    }}
                                     className={`p-0.5 rounded transition-colors ${
                                       isRepDownvoted ? 'text-red-700 font-bold' : 'text-stone-400 hover:text-red-600'
                                     }`}
@@ -1201,6 +1281,45 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
         onConfirm={handleConfirmDelete}
         onCancel={() => setIsDeleteModalOpen(false)}
       />
+
+      {isDownloadModalOpen && (
+        <div
+          onClick={() => setIsDownloadModalOpen(false)}
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xs cursor-default"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-stone-200 text-center space-y-4"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
+              <Download className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-stone-900">¿Estas seguro que queres descargar esta receta?</h3>
+              <p className="text-xs text-stone-500 mt-1">Se generará un documento en formato imprimible con los ingredientes y pasos de "{recipe.title}".</p>
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDownloadModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-100 rounded-xl cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDownloadModalOpen(false);
+                  exportRecipePdf(recipe);
+                }}
+                className="px-4 py-2 text-xs font-bold bg-[#E09F3E] hover:bg-[#835500] text-white rounded-xl shadow-xs cursor-pointer transition-colors"
+              >
+                Confirmar descarga
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Recipe, Ingredient, Step, DietaryTag, RecipeStatus } from '../types';
 import { useApp } from '../context/AppContext';
+import { resizeImageToThumbnail } from '../utils/imageUtils';
 import {
   X,
   Plus,
@@ -20,7 +21,8 @@ import {
   UserCheck,
   UserX,
   Search,
-  Info
+  Info,
+  Camera
 } from 'lucide-react';
 
 interface RecipeEditorModalProps {
@@ -39,16 +41,20 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
   const [title, setTitle] = useState(recipeToEdit?.title || '');
   const [description, setDescription] = useState(recipeToEdit?.description || '');
   const [coverImage, setCoverImage] = useState(recipeToEdit?.coverImage || '');
-  const [prepTimeMin, setPrepTimeMin] = useState(recipeToEdit?.prepTimeMin || 20);
-  const [cookTimeMin, setCookTimeMin] = useState(recipeToEdit?.cookTimeMin || 30);
-  const [servings, setServings] = useState(recipeToEdit?.servings || 4);
+  const [prepTimeMin, setPrepTimeMin] = useState<number | ''>(recipeToEdit?.prepTimeMin ?? '');
+  const [cookTimeMin, setCookTimeMin] = useState<number | ''>(recipeToEdit?.cookTimeMin ?? '');
+  const [servings, setServings] = useState<number | ''>(recipeToEdit?.servings ?? '');
   const [difficulty, setDifficulty] = useState<Recipe['difficulty']>(recipeToEdit?.difficulty || 'facil');
   const [category, setCategory] = useState<Recipe['category']>(recipeToEdit?.category || 'platos_fuertes');
-  const [tags, setTags] = useState<DietaryTag[]>(recipeToEdit?.tags || ['vegetariano']);
+  const [tags, setTags] = useState<DietaryTag[]>(recipeToEdit?.tags || []);
   const [videoUrl, setVideoUrl] = useState(recipeToEdit?.videoUrl || '');
   const [coAuthorsText, setCoAuthorsText] = useState(recipeToEdit?.coAuthors?.join(', ') || '');
   const [showCollaboratorSuggestions, setShowCollaboratorSuggestions] = useState(false);
   
+  // Local image file upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
   // Publication Status & Scheduling
   const [status, setStatus] = useState<RecipeStatus>(recipeToEdit?.status || 'published');
   const [scheduledDate, setScheduledDate] = useState(
@@ -57,61 +63,54 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       : new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16)
   );
 
-  // Ingredients
-  const [ingredients, setIngredients] = useState<Ingredient[]>(
-    recipeToEdit?.ingredients || [
-      {
-        id: 'ing-custom-1',
-        name: 'Aceite de oliva virgen extra',
-        quantity: 30,
-        unit: 'ml',
-        estimatedPrice: 1.5,
-        storeName: 'Supermercado Central Gourmet',
-        storeLocation: 'Av. Libertador 880',
-        inStock: true,
-        stockLevel: 'alto',
-        category: 'frescos'
-      },
-      {
-        id: 'ing-custom-2',
-        name: 'Ajo fresco triturado',
-        quantity: 2,
-        unit: 'dientes',
-        estimatedPrice: 0.4,
-        storeName: 'Mercado Fresco Orgánico',
-        storeLocation: 'Paseo de la Ribera 45',
-        inStock: true,
-        stockLevel: 'alto',
-        category: 'frescos'
-      }
-    ]
-  );
+  // Ingredients: empty array when creating a new recipe
+  const [ingredients, setIngredients] = useState<Ingredient[]>(recipeToEdit?.ingredients ? recipeToEdit.ingredients.map(i => ({ ...i })) : []);
 
   // Steps
   const [steps, setSteps] = useState<Step[]>(
-    recipeToEdit?.steps || [
-      {
-        stepNumber: 1,
-        title: 'Preparación y mise en place',
-        description: 'Lavar y cortar todos los ingredientes frescos según las medidas indicadas.',
-        durationMinutes: 10,
-        tip: 'Tener todo pesado y listo antes de calentar sartenes u ollas.'
-      },
-      {
-        stepNumber: 2,
-        title: 'Cocción principal',
-        description: 'Cocinar a fuego moderado removiendo constantemente hasta alcanzar el punto deseado.',
-        durationMinutes: 20
-      }
-    ]
+    recipeToEdit?.steps && recipeToEdit.steps.length > 0
+      ? recipeToEdit.steps.map(s => ({ ...s }))
+      : [
+          {
+            stepNumber: 1,
+            title: '',
+            description: '',
+            durationMinutes: 10
+          }
+        ]
   );
 
-  // Nutrition
-  const [calories, setCalories] = useState(recipeToEdit?.nutrition?.calories || 320);
-  const [proteinG, setProteinG] = useState(recipeToEdit?.nutrition?.proteinG || 12);
-  const [carbsG, setCarbsG] = useState(recipeToEdit?.nutrition?.carbsG || 35);
-  const [fatG, setFatG] = useState(recipeToEdit?.nutrition?.fatG || 14);
-  const [fiberG, setFiberG] = useState(recipeToEdit?.nutrition?.fiberG || 5);
+  // Nutrition: empty numbers when creating a new recipe
+  const [calories, setCalories] = useState<number | ''>(recipeToEdit?.nutrition?.calories ?? '');
+  const [proteinG, setProteinG] = useState<number | ''>(recipeToEdit?.nutrition?.proteinG ?? '');
+  const [carbsG, setCarbsG] = useState<number | ''>(recipeToEdit?.nutrition?.carbsG ?? '');
+  const [fatG, setFatG] = useState<number | ''>(recipeToEdit?.nutrition?.fatG ?? '');
+  const [fiberG, setFiberG] = useState<number | ''>(recipeToEdit?.nutrition?.fiberG ?? '');
+
+  const handleLocalImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Por favor selecciona un archivo de imagen válido (JPEG, PNG, WEBP).');
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const dataUrl = await resizeImageToThumbnail(file, 1200, 0.85);
+      setCoverImage(dataUrl);
+      showToast('Imagen cargada con éxito');
+    } catch (err) {
+      console.error('Error reading image file:', err);
+      showToast('No se pudo procesar la imagen seleccionada.');
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -136,20 +135,7 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
         setIngredients(
           recipeToEdit.ingredients && recipeToEdit.ingredients.length > 0
             ? recipeToEdit.ingredients.map(i => ({ ...i }))
-            : [
-                {
-                  id: `ing-${Date.now()}-1`,
-                  name: '',
-                  quantity: 1,
-                  unit: 'unidad',
-                  estimatedPrice: 1.0,
-                  storeName: 'Mercado Fresco Orgánico',
-                  storeLocation: 'Centro',
-                  inStock: true,
-                  stockLevel: 'alto',
-                  category: 'frescos'
-                }
-              ]
+            : []
         );
         setSteps(
           recipeToEdit.steps && recipeToEdit.steps.length > 0
@@ -157,58 +143,45 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             : [
                 {
                   stepNumber: 1,
-                  title: 'Preparación y mise en place',
+                  title: '',
                   description: '',
                   durationMinutes: 10
                 }
               ]
         );
-        setCalories(recipeToEdit.nutrition?.calories ?? 300);
-        setProteinG(recipeToEdit.nutrition?.proteinG ?? 10);
-        setCarbsG(recipeToEdit.nutrition?.carbsG ?? 30);
-        setFatG(recipeToEdit.nutrition?.fatG ?? 10);
-        setFiberG(recipeToEdit.nutrition?.fiberG ?? 4);
+        setCalories(recipeToEdit.nutrition?.calories ?? '');
+        setProteinG(recipeToEdit.nutrition?.proteinG ?? '');
+        setCarbsG(recipeToEdit.nutrition?.carbsG ?? '');
+        setFatG(recipeToEdit.nutrition?.fatG ?? '');
+        setFiberG(recipeToEdit.nutrition?.fiberG ?? '');
       } else {
         setTitle('');
         setDescription('');
         setCoverImage('');
-        setPrepTimeMin(20);
-        setCookTimeMin(30);
-        setServings(4);
+        setPrepTimeMin('');
+        setCookTimeMin('');
+        setServings('');
         setDifficulty('facil');
         setCategory('platos_fuertes');
-        setTags(['vegetariano']);
+        setTags([]);
         setVideoUrl('');
         setCoAuthorsText('');
         setStatus('published');
         setScheduledDate(new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16));
-        setIngredients([
-          {
-            id: `ing-${Date.now()}-1`,
-            name: 'Aceite de oliva virgen extra',
-            quantity: 30,
-            unit: 'ml',
-            estimatedPrice: 2800,
-            storeName: 'Carrefour Market',
-            storeLocation: 'Av. Corrientes 3247, Abasto',
-            inStock: true,
-            stockLevel: 'alto',
-            category: 'frescos'
-          }
-        ]);
+        setIngredients([]);
         setSteps([
           {
             stepNumber: 1,
-            title: 'Preparación y mise en place',
+            title: '',
             description: '',
             durationMinutes: 10
           }
         ]);
-        setCalories(320);
-        setProteinG(12);
-        setCarbsG(35);
-        setFatG(14);
-        setFiberG(5);
+        setCalories('');
+        setProteinG('');
+        setCarbsG('');
+        setFatG('');
+        setFiberG('');
       }
     }
   }, [isOpen, recipeToEdit]);
@@ -322,9 +295,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       coAuthors: coAuthorsList,
       status,
       scheduledPublishDate: status === 'scheduled' ? new Date(scheduledDate).toISOString() : undefined,
-      prepTimeMin: Number(prepTimeMin),
-      cookTimeMin: Number(cookTimeMin),
-      servings: Number(servings),
+      prepTimeMin: Number(prepTimeMin) || 0,
+      cookTimeMin: Number(cookTimeMin) || 0,
+      servings: Number(servings) || 1,
       difficulty,
       category,
       tags,
@@ -332,11 +305,11 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
       steps,
       videoUrl: videoUrl.trim() || undefined,
       nutrition: {
-        calories: Number(calories),
-        proteinG: Number(proteinG),
-        carbsG: Number(carbsG),
-        fatG: Number(fatG),
-        fiberG: Number(fiberG)
+        calories: Number(calories) || 0,
+        proteinG: Number(proteinG) || 0,
+        carbsG: Number(carbsG) || 0,
+        fatG: Number(fatG) || 0,
+        fiberG: Number(fiberG) || 0
       }
     };
 
@@ -500,8 +473,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   <input
                     type="number"
                     min="1"
+                    placeholder="0"
                     value={prepTimeMin}
-                    onChange={(e) => setPrepTimeMin(Number(e.target.value))}
+                    onChange={(e) => setPrepTimeMin(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -512,8 +486,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   <input
                     type="number"
                     min="0"
+                    placeholder="0"
                     value={cookTimeMin}
-                    onChange={(e) => setCookTimeMin(Number(e.target.value))}
+                    onChange={(e) => setCookTimeMin(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -524,8 +499,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                   <input
                     type="number"
                     min="1"
+                    placeholder="0"
                     value={servings}
-                    onChange={(e) => setServings(Number(e.target.value))}
+                    onChange={(e) => setServings(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -538,31 +514,64 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
                   Foto de Portada de la Receta *
                 </label>
-                <div className="flex gap-2">
+
+                {/* Hidden file input for uploading from device */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleLocalImageSelect}
+                  className="hidden"
+                />
+
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="url"
-                    required
-                    value={coverImage}
-                    onChange={(e) => setCoverImage(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500"
-                    placeholder="https://..."
+                    value={coverImage.startsWith('data:') ? 'Imagen subida desde tu dispositivo' : coverImage}
+                    onChange={(e) => {
+                      if (!coverImage.startsWith('data:')) {
+                        setCoverImage(e.target.value);
+                      }
+                    }}
+                    disabled={coverImage.startsWith('data:')}
+                    className="flex-1 px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-amber-500 bg-white disabled:bg-stone-100 disabled:text-stone-600 truncate"
+                    placeholder="URL de imagen (https://...) o sube un archivo"
                   />
-                  {coverImage && (
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setCoverImage('')}
-                      className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl text-xs font-semibold"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingImage}
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Subir archivo de imagen desde tu dispositivo"
                     >
-                      Limpiar
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{isUploadingImage ? 'Cargando...' : 'Subir imagen'}</span>
                     </button>
-                  )}
+                    {coverImage && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCoverImage('');
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl text-xs font-semibold cursor-pointer"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Image preview or empty placeholder */}
+                {/* Image preview or empty placeholder matching platform style */}
                 {!coverImage.trim() ? (
-                  <div className="mt-2 h-32 rounded-2xl bg-amber-50/50 border-2 border-dashed border-amber-300/80 flex flex-col items-center justify-center text-center p-3">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-2 h-36 rounded-2xl bg-amber-50/50 border-2 border-dashed border-amber-300/80 flex flex-col items-center justify-center text-center p-4 cursor-pointer hover:bg-amber-50 transition-colors group"
+                    title="Haz clic para subir una foto desde tu dispositivo"
+                  >
                     <span
-                      className="material-symbols-outlined text-[#835500] text-[36px] mb-1"
+                      className="material-symbols-outlined text-[#835500] text-[40px] mb-1 group-hover:scale-110 transition-transform"
                       style={{ fontVariationSettings: "'FILL' 1" }}
                     >
                       room_service
@@ -570,12 +579,13 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                     <span className="text-xs font-bold text-stone-800">
                       Aún no se ha seleccionado una imágen
                     </span>
-                    <span className="text-[10px] text-stone-500 mt-0.5">
-                      Ingresa una URL propia para visualizar la receta
+                    <span className="text-[11px] text-stone-500 mt-1 flex items-center gap-1">
+                      <Camera className="w-3 h-3 text-amber-600" />
+                      Haz clic para subir desde tu dispositivo o ingresa un enlace
                     </span>
                   </div>
                 ) : (
-                  <div className="mt-2 h-32 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 relative group">
+                  <div className="mt-2 h-36 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 relative group">
                     <img
                       src={coverImage}
                       alt="Vista previa"
@@ -584,14 +594,25 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                         (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&auto=format&fit=crop&q=80';
                       }}
                     />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setCoverImage('')}
-                        className="px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1 cursor-pointer"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Cambiar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCoverImage('');
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>Quitar imagen</span>
+                        <span>Quitar</span>
                       </button>
                     </div>
                   </div>
@@ -898,70 +919,86 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              {ingredients.map((ing, idx) => (
-                <div
-                  key={ing.id}
-                  className="grid grid-cols-12 gap-2 items-center p-2.5 rounded-xl bg-stone-50 border border-stone-200"
-                >
-                  <div className="col-span-4 sm:col-span-4">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Nombre (ej. Harina de Almendras)"
-                      value={ing.name}
-                      onChange={(e) => handleUpdateIngredient(idx, 'name', e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs font-semibold focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div className="col-span-2 sm:col-span-2">
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="any"
-                      placeholder="Cantidad"
-                      value={ing.quantity}
-                      onChange={(e) => handleUpdateIngredient(idx, 'quantity', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div className="col-span-2 sm:col-span-2">
-                    <input
-                      type="text"
-                      placeholder="Unidad (g, ml, u)"
-                      value={ing.unit}
-                      onChange={(e) => handleUpdateIngredient(idx, 'unit', e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div className="col-span-3 sm:col-span-3">
-                    <select
-                      value={ing.storeName}
-                      onChange={(e) => handleUpdateIngredient(idx, 'storeName', e.target.value)}
-                      className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-[11px] font-semibold text-stone-800 focus:ring-1 focus:ring-amber-500 truncate"
-                    >
-                      <option value="Coto Digital">Coto Digital</option>
-                      <option value="Carrefour Market">Carrefour Market</option>
-                      <option value="Jumbo Hipermercado">Jumbo Hipermercado</option>
-                      <option value="Supermercados Día">Supermercados Día</option>
-                      <option value="Mercado Central">Mercado Central</option>
-                    </select>
-                  </div>
-
-                  <div className="col-span-1 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveIngredient(idx)}
-                      disabled={ingredients.length <= 1}
-                      className="p-1 text-stone-400 hover:text-red-600 disabled:opacity-30"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+              {ingredients.length === 0 ? (
+                <div className="p-6 text-center bg-amber-50/40 border-2 border-dashed border-amber-200/80 rounded-2xl">
+                  <p className="text-xs text-stone-600 font-medium mb-2.5">
+                    Aún no has agregado ningún ingrediente a esta receta.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleAddIngredient}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Primer Ingrediente</span>
+                  </button>
                 </div>
-              ))}
+              ) : (
+                ingredients.map((ing, idx) => (
+                  <div
+                    key={ing.id}
+                    className="grid grid-cols-12 gap-2 items-center p-2.5 rounded-xl bg-stone-50 border border-stone-200"
+                  >
+                    <div className="col-span-4 sm:col-span-4">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Nombre (ej. Harina de Almendras)"
+                        value={ing.name}
+                        onChange={(e) => handleUpdateIngredient(idx, 'name', e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs font-semibold focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="col-span-2 sm:col-span-2">
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="any"
+                        placeholder="Cantidad"
+                        value={ing.quantity}
+                        onChange={(e) => handleUpdateIngredient(idx, 'quantity', Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="col-span-2 sm:col-span-2">
+                      <input
+                        type="text"
+                        placeholder="Unidad (g, ml, u)"
+                        value={ing.unit}
+                        onChange={(e) => handleUpdateIngredient(idx, 'unit', e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-stone-300 text-xs focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="col-span-3 sm:col-span-3">
+                      <select
+                        value={ing.storeName}
+                        onChange={(e) => handleUpdateIngredient(idx, 'storeName', e.target.value)}
+                        className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-[11px] font-semibold text-stone-800 focus:ring-1 focus:ring-amber-500 truncate"
+                      >
+                        <option value="Coto Digital">Coto Digital</option>
+                        <option value="Carrefour Market">Carrefour Market</option>
+                        <option value="Jumbo Hipermercado">Jumbo Hipermercado</option>
+                        <option value="Supermercados Día">Supermercados Día</option>
+                        <option value="Mercado Central">Mercado Central</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-1 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveIngredient(idx)}
+                        className="p-1 text-stone-400 hover:text-red-600 transition-colors"
+                        title="Quitar ingrediente"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -1056,8 +1093,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 <label className="text-[10px] text-stone-500 block mb-0.5">Calorías (kcal)</label>
                 <input
                   type="number"
+                  placeholder="0"
                   value={calories}
-                  onChange={(e) => setCalories(Number(e.target.value))}
+                  onChange={(e) => setCalories(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-xs font-bold"
                 />
               </div>
@@ -1065,8 +1103,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 <label className="text-[10px] text-stone-500 block mb-0.5">Proteínas (g)</label>
                 <input
                   type="number"
+                  placeholder="0"
                   value={proteinG}
-                  onChange={(e) => setProteinG(Number(e.target.value))}
+                  onChange={(e) => setProteinG(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-xs"
                 />
               </div>
@@ -1074,8 +1113,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 <label className="text-[10px] text-stone-500 block mb-0.5">Carbohidratos (g)</label>
                 <input
                   type="number"
+                  placeholder="0"
                   value={carbsG}
-                  onChange={(e) => setCarbsG(Number(e.target.value))}
+                  onChange={(e) => setCarbsG(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-xs"
                 />
               </div>
@@ -1083,8 +1123,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 <label className="text-[10px] text-stone-500 block mb-0.5">Grasas (g)</label>
                 <input
                   type="number"
+                  placeholder="0"
                   value={fatG}
-                  onChange={(e) => setFatG(Number(e.target.value))}
+                  onChange={(e) => setFatG(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-xs"
                 />
               </div>
@@ -1092,8 +1133,9 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 <label className="text-[10px] text-stone-500 block mb-0.5">Fibra (g)</label>
                 <input
                   type="number"
+                  placeholder="0"
                   value={fiberG}
-                  onChange={(e) => setFiberG(Number(e.target.value))}
+                  onChange={(e) => setFiberG(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-2 py-1.5 bg-white rounded-lg border border-stone-300 text-xs"
                 />
               </div>
@@ -1201,16 +1243,19 @@ export const RecipeEditorModal: React.FC<RecipeEditorModalProps> = ({
                 </div>
 
                 {status === 'scheduled' && (
-                  <div className="p-3 bg-white rounded-xl border border-amber-300 flex flex-col sm:flex-row items-center gap-3">
-                    <span className="text-xs font-bold text-stone-700 shrink-0">
-                      Fecha y Hora de Publicación Automática:
-                    </span>
+                  <div className="w-full p-4 bg-white rounded-2xl border border-amber-300 shadow-2xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span className="text-xs font-bold text-stone-800">
+                        Fecha y Hora de Publicación Automática:
+                      </span>
+                    </div>
                     <input
                       type="datetime-local"
                       required
                       value={scheduledDate}
                       onChange={(e) => setScheduledDate(e.target.value)}
-                      className="px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-semibold text-stone-800"
+                      className="w-full sm:w-auto px-3.5 py-2 rounded-xl border border-stone-300 text-xs font-semibold text-stone-800 focus:ring-2 focus:ring-amber-500 bg-white shadow-2xs"
                     />
                   </div>
                 )}

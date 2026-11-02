@@ -45,9 +45,9 @@ export const ModerationAdminPanel: React.FC<ModerationAdminPanelProps> = ({ onOp
   // Modal confirmation state for deletion
   const [reportToDelete, setReportToDelete] = useState<ModerationReport | null>(null);
 
-  const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
+  const isAdmin = currentUser.role === 'admin';
 
-  if (!isStaff) {
+  if (!isAdmin) {
     return (
       <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-4 max-w-lg mx-auto my-12 shadow-sm">
         <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
@@ -55,10 +55,10 @@ export const ModerationAdminPanel: React.FC<ModerationAdminPanelProps> = ({ onOp
         </div>
         <h2 className="font-bold text-stone-900 text-xl font-display">Acceso Restringido</h2>
         <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-          El panel de moderación está reservado exclusivamente para cuentas de moderación con rol de <strong>Administrador o Editor</strong>.
+          El panel de moderación está reservado exclusivamente para cuentas de moderación con rol de <strong>Administrador</strong>.
         </p>
         <p className="text-xs text-stone-400">
-          Puedes cambiar rápidamente a una cuenta de moderación autorizada para evaluar los reportes:
+          Puedes cambiar rápidamente a la cuenta de Administrador para evaluar las denuncias:
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <button
@@ -67,13 +67,6 @@ export const ModerationAdminPanel: React.FC<ModerationAdminPanelProps> = ({ onOp
             className="w-full sm:w-auto px-5 py-2.5 bg-[#835500] hover:bg-[#5a3900] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
           >
             Acceder como Ignacio (Admin)
-          </button>
-          <button
-            type="button"
-            onClick={() => selectSpecificUser('user-lucia')}
-            className="w-full sm:w-auto px-5 py-2.5 bg-[#e09f3e] hover:bg-[#c58529] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
-          >
-            Acceder como Lucía (Editora)
           </button>
         </div>
       </div>

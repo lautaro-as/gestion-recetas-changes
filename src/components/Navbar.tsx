@@ -31,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     notifications,
     markNotificationAsRead,
     markAllNotificationsAsRead,
+    promptAuthRequired,
   } = useApp();
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
@@ -56,7 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const roleBadge = getRoleBadge(currentUser.role);
-  const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
+  const isAdmin = currentUser.role === 'admin';
 
   return (
     <header className="sticky top-0 left-0 w-full z-50">
@@ -153,19 +154,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </button>
 
-              <button
-                onClick={() => setActiveView('perfil')}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                  activeView === 'perfil'
-                    ? 'bg-white text-[#5A3900] shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
-                    : 'text-white hover:bg-white/20'
-                }`}
-                type="button"
-              >
-                Mi perfil
-              </button>
+              {isAuthenticated && (
+                <button
+                  onClick={() => setActiveView('perfil')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                    activeView === 'perfil'
+                      ? 'bg-white text-[#5A3900] shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
+                      : 'text-white hover:bg-white/20'
+                  }`}
+                  type="button"
+                >
+                  Mi perfil
+                </button>
+              )}
 
-              {isStaff && (
+              {isAdmin && (
                 <button
                   onClick={() => setActiveView('moderacion')}
                   className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
@@ -200,9 +203,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="material-symbols-outlined text-[24px]">search</span>
             </button>
 
-            {/* Nueva Receta Button (Hidden on mobile, visible on desktop) */}
+            {/* Nueva Receta Button (Prompt login if guest) */}
             <button
-              onClick={onOpenCreateRecipe}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  onOpenAuth('login');
+                } else {
+                  onOpenCreateRecipe();
+                }
+              }}
               className="hidden lg:inline-flex items-center gap-1.5 bg-white text-[#835500] font-semibold text-sm px-4 py-2 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:bg-[#FFF8F0] hover:text-[#5A3900] transition-all cursor-pointer"
               type="button"
             >
@@ -210,16 +219,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Nueva receta</span>
             </button>
 
-            {/* Shopping Cart Button (Hidden on mobile, accessible via hamburger menu) */}
+            {/* Shopping Cart Button (Prompt login if guest) */}
             <button
-              onClick={onOpenCart}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  onOpenAuth('login');
+                } else {
+                  onOpenCart();
+                }
+              }}
               aria-label="Carrito de compras"
-              title="Carrito de compras"
+              title={isAuthenticated ? "Carrito de compras" : "Inicia sesión para ver tu carrito de compras"}
               className="hidden lg:flex relative p-2 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer items-center justify-center"
               type="button"
             >
               <span className="material-symbols-outlined text-[24px]">shopping_cart</span>
-              {cart.length > 0 && (
+              {isAuthenticated && cart.length > 0 && (
                 <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-white text-[#835500] text-[11px] font-bold rounded-full shadow-sm">
                   {cart.length}
                 </span>
@@ -230,11 +245,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative">
               <button
                 onClick={() => {
+                  if (!isAuthenticated) {
+                    onOpenAuth('login');
+                    promptAuthRequired('Inicia sesión para revisar tus notificaciones.');
+                    return;
+                  }
                   setShowNotifMenu(!showNotifMenu);
                   setShowRoleMenu(false);
                 }}
                 aria-label="Notificaciones"
-                title="Notificaciones"
+                title={isAuthenticated ? "Notificaciones" : "Inicia sesión para ver tus notificaciones"}
                 className="relative p-2 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer"
                 type="button"
               >
@@ -642,32 +662,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                     )}
                   </button>
 
-                  {/* Mi Perfil */}
-                  <button
-                    onClick={() => {
-                      setActiveView('perfil');
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
-                      activeView === 'perfil'
-                        ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
-                        : 'text-stone-700 hover:bg-stone-50'
-                    }`}
-                    type="button"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-[#835500] text-[22px]">
-                        person
-                      </span>
-                      <span>Mi Perfil</span>
-                    </div>
-                    {activeView === 'perfil' && (
-                      <span className="w-2 h-2 rounded-full bg-[#E09F3E]" />
-                    )}
-                  </button>
+                  {/* Mi Perfil (Solo usuarios autenticados) */}
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => {
+                        setActiveView('perfil');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold transition-all cursor-pointer ${
+                        activeView === 'perfil'
+                          ? 'bg-[#FFDDB9]/40 text-[#5A3900] font-bold border border-[#E09F3E]/40'
+                          : 'text-stone-700 hover:bg-stone-50'
+                      }`}
+                      type="button"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-[#835500] text-[22px]">
+                          person
+                        </span>
+                        <span>Mi Perfil</span>
+                      </div>
+                      {activeView === 'perfil' && (
+                        <span className="w-2 h-2 rounded-full bg-[#E09F3E]" />
+                      )}
+                    </button>
+                  )}
 
-                  {/* Moderación si es Staff */}
-                  {isStaff && (
+                  {/* Moderación solo para Administradores */}
+                  {isAdmin && (
                     <button
                       onClick={() => {
                         setActiveView('moderacion');
@@ -686,8 +708,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </span>
                         <span>Moderación</span>
                       </div>
-                      <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md">
-                        Staff
+                      <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-md">
+                        Admin
                       </span>
                     </button>
                   )}
@@ -702,7 +724,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      onOpenCart();
+                      if (!isAuthenticated) {
+                        onOpenAuth('login');
+                      } else {
+                        onOpenCart();
+                      }
                     }}
                     className="w-full flex items-center justify-between p-3 rounded-2xl text-left text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-all cursor-pointer"
                     type="button"
@@ -713,7 +739,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </span>
                       <span>Carrito de Ingredientes</span>
                     </div>
-                    {cart.length > 0 && (
+                    {isAuthenticated && cart.length > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#E09F3E] text-white">
                         {cart.length}
                       </span>

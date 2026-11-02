@@ -56,6 +56,8 @@ function AppContent() {
     setRecipeToConfirmDownload,
     executeDownloadRecipePdf,
     toast,
+    promptAuthRequired,
+    authPromptTrigger,
   } = useApp();
 
   const isStaff = currentUser.role === 'admin' || currentUser.role === 'editor';
@@ -70,6 +72,21 @@ function AppContent() {
       setIsBrowsingAsGuest(false);
     }
   }, [isAuthenticated]);
+
+  // When an action requires auth, return guest to login view
+  React.useEffect(() => {
+    if (authPromptTrigger && !isAuthenticated) {
+      setIsBrowsingAsGuest(false);
+      setAuthInitialMode('login');
+    }
+  }, [authPromptTrigger, isAuthenticated]);
+
+  // Guests cannot access 'perfil' view; redirect immediately to 'explorar'
+  React.useEffect(() => {
+    if (!isAuthenticated && activeView === 'perfil') {
+      setActiveView('explorar');
+    }
+  }, [isAuthenticated, activeView]);
 
   // RF-16: Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -230,16 +247,34 @@ function AppContent() {
   ]);
 
   const handleOpenReport = (type: 'recipe' | 'profile', id: string, title: string) => {
+    if (!isAuthenticated) {
+      setIsBrowsingAsGuest(false);
+      setAuthInitialMode('login');
+      promptAuthRequired('Debes iniciar sesión para enviar una denuncia.');
+      return;
+    }
     setReportTarget({ type, id, title });
     setIsReportOpen(true);
   };
 
   const handleEditRecipe = (recipe: Recipe) => {
+    if (!isAuthenticated) {
+      setIsBrowsingAsGuest(false);
+      setAuthInitialMode('login');
+      promptAuthRequired('Debes iniciar sesión para editar recetas.');
+      return;
+    }
     setRecipeToEdit(recipe);
     setIsEditorOpen(true);
   };
 
   const handleCreateNewRecipe = () => {
+    if (!isAuthenticated) {
+      setIsBrowsingAsGuest(false);
+      setAuthInitialMode('login');
+      promptAuthRequired('Debes iniciar sesión para publicar una receta.');
+      return;
+    }
     setRecipeToEdit(null);
     setIsEditorOpen(true);
   };
@@ -278,7 +313,15 @@ function AppContent() {
         activeView={activeView}
         setActiveView={setActiveView}
         onOpenCreateRecipe={handleCreateNewRecipe}
-        onOpenCart={() => setIsCartOpen(true)}
+        onOpenCart={() => {
+          if (!isAuthenticated) {
+            setIsBrowsingAsGuest(false);
+            setAuthInitialMode('login');
+            promptAuthRequired('Inicia sesión para ver tu carrito de compras.');
+          } else {
+            setIsCartOpen(true);
+          }
+        }}
         onOpenAuth={(mode) => {
           setAuthInitialMode(mode || 'login');
           if (!isAuthenticated) {
@@ -538,8 +581,8 @@ function AppContent() {
           />
         )}
 
-        {/* VIEW 5: Mi Perfil Personal */}
-        {activeView === 'perfil' && (
+        {/* VIEW 5: Mi Perfil Personal (Solo usuarios autenticados) */}
+        {activeView === 'perfil' && isAuthenticated && (
           <UserProfileView
             onOpenDetail={(r) => setSelectedRecipeDetail(r)}
             onOpenReport={handleOpenReport}
@@ -549,9 +592,9 @@ function AppContent() {
           />
         )}
 
-        {/* VIEW 6: Panel de Moderación */}
+        {/* VIEW 6: Panel de Moderación (Solo Administradores) */}
         {activeView === 'moderacion' && (
-          isStaff ? (
+          currentUser.role === 'admin' ? (
             <ModerationAdminPanel onOpenDetail={(r) => setSelectedRecipeDetail(r)} />
           ) : (
             <div className="bg-white rounded-3xl p-12 text-center border border-stone-200/90 space-y-4 max-w-lg mx-auto my-12 shadow-sm">
@@ -560,10 +603,10 @@ function AppContent() {
               </div>
               <h2 className="font-bold text-stone-900 text-xl font-display">Acceso Restringido</h2>
               <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-                El panel de moderación está reservado exclusivamente para cuentas de moderación con rol de <strong>Administrador o Editor</strong>.
+                El panel de moderación está reservado exclusivamente para cuentas con rol de <strong>Administrador</strong>. Los editores y usuarios estándar no tienen acceso a esta sección.
               </p>
               <p className="text-xs text-stone-400">
-                Puedes cambiar rápidamente a una cuenta de moderación para auditar la plataforma:
+                Puedes cambiar rápidamente a la cuenta de Administrador para auditar la plataforma:
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                 <button
@@ -572,13 +615,6 @@ function AppContent() {
                   className="w-full sm:w-auto px-5 py-2.5 bg-[#835500] hover:bg-[#5a3900] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cambiar a Ignacio (Admin)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectSpecificUser('user-lucia')}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-[#e09f3e] hover:bg-[#c58529] text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Cambiar a Lucía (Editora)
                 </button>
               </div>
               <button

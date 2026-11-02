@@ -207,6 +207,24 @@ const mergeAllReplies = (firestoreReplies: ForumReply[] = []): ForumReply[] => {
   return Array.from(map.values());
 };
 
+const mergeAllReports = (firestoreReports: ModerationReport[] = [], cachedReports: ModerationReport[] = []): ModerationReport[] => {
+  const map = new Map<string, ModerationReport>();
+
+  for (const initR of INITIAL_REPORTS) {
+    map.set(initR.id, initR);
+  }
+
+  for (const c of cachedReports) {
+    if (c?.id) map.set(c.id, c);
+  }
+
+  for (const f of firestoreReports) {
+    if (f?.id) map.set(f.id, f);
+  }
+
+  return Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
 interface AppContextType {
   // Authentication & Users
   isAuthenticated: boolean;
@@ -234,6 +252,8 @@ interface AppContextType {
   switchActiveSubProfile: (subProfileId: string | null) => void;
   requestPasswordReset: (email: string) => { success: boolean; message: string };
   followUserToggle: (targetUserId: string) => void;
+  authPromptTrigger: number;
+  promptAuthRequired: (message?: string) => void;
   
   // Recipes
   recipes: Recipe[];
@@ -327,10 +347,19 @@ const STORAGE_KEYS = {
   RECIPES_CACHE: 'gusto_recipes_cache_v2',
   FORUM_TOPICS_CACHE: 'gusto_forum_topics_cache_v2',
   FORUM_REPLIES_CACHE: 'gusto_forum_replies_cache_v2',
+  REPORTS_CACHE: 'gusto_moderation_reports_cache_v2',
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+  const [authPromptTrigger, setAuthPromptTrigger] = useState<number>(0);
+
+  const promptAuthRequired = (message?: string) => {
+    setAuthPromptTrigger(Date.now());
+    if (message) {
+      showToast(message);
+    }
+  };
 
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -403,7 +432,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
     return INITIAL_FORUM_REPLIES;
   });
-  const [reports, setReports] = useState<ModerationReport[]>(INITIAL_REPORTS);
+  const [reports, setReports] = useState<ModerationReport[]>(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(STORAGE_KEYS.REPORTS_CACHE) || '[]');
+      if (Array.isArray(cached) && cached.length > 0) {
+        return mergeAllReports([], cached);
+      }
+    } catch {}
+    return INITIAL_REPORTS;
+  });
   const [collections, setCollections] = useState<RecipeCollection[]>(INITIAL_COLLECTIONS);
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
 
@@ -583,9 +620,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 8. Moderation Reports Snapshot Listener
     const unsubReports = onSnapshot(collection(db, 'moderation_reports'), (snapshot) => {
+      let firestoreList: ModerationReport[] = [];
       if (!snapshot.empty) {
-        const list = snapshot.docs.map(d => d.data() as ModerationReport);
-        setReports(list);
+        firestoreList = snapshot.docs.map(d => d.data() as ModerationReport);
+      }
+      try {
+        const cached: ModerationReport[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.REPORTS_CACHE) || '[]');
+        const merged = mergeAllReports(firestoreList, Array.isArray(cached) ? cached : []);
+        setReports(merged);
+        localStorage.setItem(STORAGE_KEYS.REPORTS_CACHE, JSON.stringify(merged));
+      } catch {
+        setReports(mergeAllReports(firestoreList, []));
       }
     }, (error) => {
       console.info('Firestore moderation reports notice:', error.message);
@@ -700,7 +745,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             password: null as any,
             avatar: fbUser.photoURL ?? '/assets/aistudio/default_avatar_b96d7689.jpg',
             role: isAdminEmail ? 'admin' : 'usuario',
-            bio: 'Miembro activo de la comunidad gastronómica Gusto en Firebase.',
+            bio: 'Miembro activo de la comunidad gastronómica Gusto.',
             specialties: ['Cocina Casera'],
             dietaryPreferences: [],
             subprofiles: [],
@@ -717,14 +762,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUserId(fbUser.uid);
         setIsAuthenticated(true);
         localStorage.removeItem(STORAGE_KEYS.IS_LOGGED_OUT);
-        showToast(`¡Bienvenido a Gusto, ${profile.name}! (Firebase Auth)`);
+        showToast(`¡Bienvenido a Gusto, ${profile.name}!`);
         return true;
       }
       return false;
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
       if (error?.code === 'auth/unauthorized-domain') {
-        showToast('Dominio no autorizado: agrega gusto-recetas.vercel.app en Firebase Console > Authentication > Settings > Authorized domains');
+        showToast('Dominio web no autorizado para inicio de sesión con Google.');
       } else if (error?.code === 'auth/popup-closed-by-user') {
         showToast('Ventana de autenticación cerrada por el usuario.');
       } else {
@@ -1099,7 +1144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       handleFirestoreError(err, OperationType.UPDATE, `recipes/${id}`)
     );
 
-    showToast(`Receta "${updatedRecipe.title}" actualizada en Firestore.`);
+    showToast(`Receta "${updatedRecipe.title}" actualizada exitosamente.`);
     return true;
   };
 
@@ -1155,6 +1200,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleLikeRecipe = (recipeId: string) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para valorar recetas.');
+      return;
+    }
     const targetRecipe = recipes.find(r => r.id === recipeId);
     const wasAlreadyLiked = targetRecipe ? (targetRecipe.likedUserIds || []).includes(currentUser.id) : false;
 
@@ -1205,6 +1254,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleDislikeRecipe = (recipeId: string) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para valorar recetas.');
+      return;
+    }
     let updatedRecipe: Recipe | null = null;
     setRecipes(prev => prev.map(r => {
       if (r.id !== recipeId) return r;
@@ -1284,6 +1337,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // COMMENTS & RATINGS (FIRESTORE PERSISTENT)
   // -------------------------------------------------------------
   const addComment = (recipeId: string, content: string, parentCommentId?: string) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para comentar en esta receta.');
+      return;
+    }
     if (!content.trim()) return;
     const newComment: RecipeComment = {
       id: `comm-${Date.now()}`,
@@ -1322,7 +1379,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setDoc(doc(db, 'recipes', recipeId), { commentsCount: (targetRecipe.commentsCount || 0) + 1 }, { merge: true }).catch(console.warn);
     }
 
-    showToast('Comentario guardado y publicado en la comunidad.');
+    // DISPATCH NOTIFICATIONS (RF-28 & Requirement 1)
+    // 1. If replying to an existing comment, notify that comment's author
+    if (parentCommentId) {
+      const parentComment = comments.find(c => c.id === parentCommentId);
+      if (parentComment && parentComment.authorId && parentComment.authorId !== currentUser.id) {
+        const notif: AppNotification = {
+          id: `notif-reply-${Date.now()}`,
+          userId: parentComment.authorId,
+          title: 'Nueva respuesta a tu comentario',
+          message: `${currentUser.name} respondió a tu comentario en "${targetRecipe?.title || 'la receta'}": "${content.trim().slice(0, 50)}${content.trim().length > 50 ? '...' : ''}"`,
+          createdAt: new Date().toISOString(),
+          read: false,
+          type: 'comment',
+          linkTarget: recipeId
+        };
+        setNotifications(prev => [notif, ...prev]);
+        setDoc(doc(db, 'notifications', notif.id), notif).catch(console.warn);
+      }
+    }
+
+    // 2. Notify the recipe author if someone else commented on their recipe
+    if (targetRecipe && targetRecipe.authorId && targetRecipe.authorId !== currentUser.id) {
+      const parentComment = parentCommentId ? comments.find(c => c.id === parentCommentId) : null;
+      if (!parentComment || parentComment.authorId !== targetRecipe.authorId) {
+        const notif: AppNotification = {
+          id: `notif-recipe-${Date.now()}`,
+          userId: targetRecipe.authorId,
+          title: 'Nuevo comentario en tu receta',
+          message: `${currentUser.name} comentó en tu receta "${targetRecipe.title}": "${content.trim().slice(0, 50)}${content.trim().length > 50 ? '...' : ''}"`,
+          createdAt: new Date().toISOString(),
+          read: false,
+          type: 'comment',
+          linkTarget: recipeId
+        };
+        setNotifications(prev => [notif, ...prev]);
+        setDoc(doc(db, 'notifications', notif.id), notif).catch(console.warn);
+      }
+    }
+
+    showToast('Comentario publicado exitosamente.');
   };
 
   const editComment = (commentId: string, newContent: string) => {
@@ -1338,7 +1434,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDoc(doc(db, 'recipe_comments', commentId), { content: newContent.trim(), updatedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
       handleFirestoreError(err, OperationType.UPDATE, `recipe_comments/${commentId}`)
     );
-    showToast('Comentario editado en Firestore.');
+    showToast('Comentario editado exitosamente.');
   };
 
   const deleteComment = (commentId: string) => {
@@ -1357,10 +1453,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteDoc(doc(db, 'recipe_comments', commentId)).catch((err) =>
       handleFirestoreError(err, OperationType.DELETE, `recipe_comments/${commentId}`)
     );
-    showToast('Comentario eliminado de Firestore.');
+    showToast('Comentario eliminado exitosamente.');
   };
 
   const toggleCommentVote = (commentId: string, type: 'like' | 'dislike') => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para valorar comentarios.');
+      return;
+    }
     let nextComment: RecipeComment | null = null;
     setComments(prev => prev.map(c => {
       if (c.id !== commentId) return c;
@@ -1434,6 +1534,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Shopping Cart & Ingredients
   const addRecipeIngredientsToCart = (recipe: Recipe, selectedIngredientIds?: string[]) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para agregar ingredientes al carrito de compras.');
+      return;
+    }
     const ingsToAdd = selectedIngredientIds 
       ? recipe.ingredients.filter(ing => selectedIngredientIds.includes(ing.id))
       : recipe.ingredients;
@@ -1467,6 +1571,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Wishlist & Collections
   const toggleWishlist = (recipeId: string) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para guardar recetas en tu lista de deseos.');
+      return;
+    }
     const list = currentUser.wishlistRecipeIds || [];
     const inWishlist = list.includes(recipeId);
     const nextList = inWishlist
@@ -1482,6 +1590,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createCollection = (name: string, description: string, recipeIds: string[], isPrivate = false) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para crear colecciones personales.');
+      return;
+    }
     const newCol: RecipeCollection = {
       id: `col-${Date.now()}`,
       name,
@@ -1495,7 +1607,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDoc(doc(db, 'recipe_collections', newCol.id), newCol).catch((err) =>
       handleFirestoreError(err, OperationType.CREATE, `recipe_collections/${newCol.id}`)
     );
-    showToast(`Colección personal "${name}" creada en Firestore.`);
+    showToast(`Colección personal "${name}" creada exitosamente.`);
   };
 
   const toggleRecipeInCollection = (collectionId: string, recipeId: string) => {
@@ -1511,8 +1623,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Colección actualizada.');
   };
 
-  // Moderation
+  // Moderation (Persistent in Firestore and cache)
   const submitReport = (targetType: 'recipe' | 'profile', targetId: string, titleOrName: string, reason: ModerationReport['reason'], details: string) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para reportar contenido a los administradores.');
+      return;
+    }
     const newReport: ModerationReport = {
       id: `rep-mod-${Date.now()}`,
       targetType,
@@ -1525,19 +1641,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'pending',
       createdAt: new Date().toISOString()
     };
-    setReports(prev => [newReport, ...prev]);
+    setReports(prev => {
+      const next = [newReport, ...prev.filter(r => r.id !== newReport.id)];
+      try {
+        localStorage.setItem(STORAGE_KEYS.REPORTS_CACHE, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     setDoc(doc(db, 'moderation_reports', newReport.id), newReport).catch((err) =>
       handleFirestoreError(err, OperationType.CREATE, `moderation_reports/${newReport.id}`)
     );
-    showToast('Tu reporte ha sido enviado a Firestore para moderación.');
+    showToast('Denuncia enviada correctamente. El equipo de administración revisará el caso.');
   };
 
   const resolveReport = (reportId: string, resolution: 'removed' | 'dismissed') => {
     const report = reports.find(r => r.id === reportId);
     if (!report) return;
 
-    if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
-      showToast('No tienes permisos de moderación para realizar esta acción.');
+    if (currentUser.role !== 'admin') {
+      showToast('Solo un Administrador puede moderar y resolver denuncias.');
       return;
     }
 
@@ -1550,19 +1672,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    const nextStatus = resolution === 'removed' ? 'resolved_removed' : 'dismissed';
-    setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: nextStatus, resolvedAt: new Date().toISOString() } : r));
+    const nextStatus: ModerationReport['status'] = resolution === 'removed' ? 'resolved_removed' : 'dismissed';
+    setReports(prev => {
+      const next: ModerationReport[] = prev.map(r => r.id === reportId ? { ...r, status: nextStatus, resolvedAt: new Date().toISOString() } : r);
+      try {
+        localStorage.setItem(STORAGE_KEYS.REPORTS_CACHE, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     setDoc(doc(db, 'moderation_reports', reportId), { status: nextStatus, resolvedAt: new Date().toISOString() }, { merge: true }).catch((err) =>
       handleFirestoreError(err, OperationType.UPDATE, `moderation_reports/${reportId}`)
     );
 
-    showToast('Reporte actualizado en Firestore.');
+    showToast(resolution === 'removed' ? 'Contenido sancionado y retirado de la plataforma.' : 'Reporte desestimado correctamente.');
   };
 
   // -------------------------------------------------------------
-  // FORUM (COMMUNITY DISCUSSIONS IN FIRESTORE)
+  // FORUM (COMMUNITY DISCUSSIONS)
   // -------------------------------------------------------------
   const createForumTopic = (category: ForumTopic['category'], title: string, content: string, tags: string[]) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para iniciar un debate en la comunidad.');
+      return '';
+    }
     const newId = `top-${Date.now()}`;
     const newTopic: ForumTopic = {
       id: newId,
@@ -1591,11 +1723,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       handleFirestoreError(err, OperationType.CREATE, `forum_topics/${newId}`)
     );
 
-    showToast(`Debate "${title}" publicado en Firestore.`);
+    showToast(`Debate "${title}" publicado exitosamente.`);
     return newId;
   };
 
   const createForumReply = (topicId: string, content: string) => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para responder en la comunidad.');
+      return;
+    }
     if (!content.trim()) return;
     const newReply: ForumReply = {
       id: `rep-${Date.now()}`,
@@ -1638,9 +1774,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         repliesCount: topic.repliesCount + 1,
         lastActivityAt: new Date().toISOString()
       }, { merge: true }).catch(console.warn);
+
+      // NOTIFY TOPIC AUTHOR (Requirement 1 & RF-28)
+      if (topic.authorId && topic.authorId !== currentUser.id) {
+        const notif: AppNotification = {
+          id: `notif-forum-${Date.now()}`,
+          userId: topic.authorId,
+          title: 'Nueva respuesta a tu debate',
+          message: `${currentUser.name} respondió a tu debate "${topic.title}": "${content.trim().slice(0, 50)}${content.trim().length > 50 ? '...' : ''}"`,
+          createdAt: new Date().toISOString(),
+          read: false,
+          type: 'comment',
+          linkTarget: topicId
+        };
+        setNotifications(prev => [notif, ...prev]);
+        setDoc(doc(db, 'notifications', notif.id), notif).catch(console.warn);
+      }
     }
 
-    showToast('Respuesta guardada en el debate.');
+    showToast('Respuesta publicada exitosamente en el debate.');
   };
 
   const toggleForumReplyLike = (replyId: string) => {
@@ -1648,6 +1800,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleForumReplyVote = (replyId: string, type: 'like' | 'dislike') => {
+    if (!isAuthenticated) {
+      promptAuthRequired('Inicia sesión para valorar respuestas en el debate.');
+      return;
+    }
     let nextReply: ForumReply | null = null;
     setForumReplies(prev => prev.map(r => {
       if (r.id !== replyId) return r;
@@ -1835,6 +1991,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchActiveSubProfile,
         requestPasswordReset,
         followUserToggle,
+        authPromptTrigger,
+        promptAuthRequired,
 
         recipes,
         createRecipe,

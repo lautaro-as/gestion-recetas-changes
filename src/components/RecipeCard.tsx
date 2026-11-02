@@ -32,6 +32,8 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     exportRecipePdf,
     exportRecipeText,
     publishScheduledNow,
+    isAuthenticated,
+    promptAuthRequired,
   } = useApp();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,6 +63,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAuthenticated) {
+      promptAuthRequired('Debes iniciar sesión para agregar ingredientes al carrito de compras.');
+      return;
+    }
     addRecipeIngredientsToCart(recipe);
     setCartSuccess(true);
     setTimeout(() => setCartSuccess(false), 1500);
@@ -137,6 +143,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+              if (!isAuthenticated) {
+                promptAuthRequired('Debes iniciar sesión para guardar recetas en tu lista de deseos.');
+                return;
+              }
               toggleWishlist(recipe.id);
             }}
             aria-label="Guardar en favoritos"
@@ -222,6 +232,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!isAuthenticated) {
+                    promptAuthRequired('Debes iniciar sesión para calificar recetas con Me Gusta.');
+                    return;
+                  }
                   toggleLikeRecipe(recipe.id);
                 }}
                 title="Me gusta"
@@ -242,6 +256,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!isAuthenticated) {
+                    promptAuthRequired('Debes iniciar sesión para calificar recetas.');
+                    return;
+                  }
                   toggleDislikeRecipe(recipe.id);
                 }}
                 title="No me gusta"
@@ -421,8 +439,12 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        onOpenReport(recipe);
                         setMenuOpen(false);
+                        if (!isAuthenticated) {
+                          promptAuthRequired('Debes iniciar sesión para denunciar una receta.');
+                          return;
+                        }
+                        onOpenReport(recipe);
                       }}
                       className="w-full px-3 py-2 text-left hover:bg-red-50 flex items-center gap-2 text-[#AB3333] border-t border-stone-100"
                     >
